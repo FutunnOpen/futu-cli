@@ -11,6 +11,8 @@ INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
 RELEASE_BASE="${FUTU_CLI_RELEASE_BASE:-$DEFAULT_RELEASE_BASE}"
 VERSION="${FUTU_CLI_VERSION:-}"
 LIBC="${FUTU_CLI_LIBC:-musl}"
+PATH_BLOCK_START="# >>> futu cli >>>"
+PATH_BLOCK_END="# <<< futu cli <<<"
 
 RELEASE_BASE="${RELEASE_BASE%/}"
 LATEST_URL="$RELEASE_BASE/releases/latest"
@@ -52,6 +54,75 @@ sha256_file() {
     return
   fi
   sha256sum "$1" | awk '{print $1}'
+}
+
+shell_quote() {
+  printf "%s" "$1" | sed "s/'/'\\\\''/g; 1s/^/'/; \$s/\$/'/"
+}
+
+path_export_line() {
+  if [ "$INSTALL_DIR" = "$DEFAULT_INSTALL_DIR" ]; then
+    echo 'export PATH="$HOME/.futu/bin:$PATH"'
+    return
+  fi
+  printf "export PATH=%s:\$PATH\n" "$(shell_quote "$INSTALL_DIR")"
+}
+
+detect_profile() {
+  if [ -n "${PROFILE:-}" ]; then
+    echo "$PROFILE"
+    return
+  fi
+  shell_name=""
+  if [ -n "${SHELL:-}" ]; then
+    shell_name="$(basename "$SHELL")"
+  fi
+  case "$shell_name" in
+    zsh) echo "$HOME/.zshrc" ;;
+    bash)
+      if [ "$(uname -s)" = "Darwin" ]; then
+        echo "$HOME/.bash_profile"
+      else
+        echo "$HOME/.bashrc"
+      fi
+      ;;
+    fish) echo "" ;;
+    *) echo "$HOME/.profile" ;;
+  esac
+}
+
+configure_path() {
+  case ":$PATH:" in
+    *":$INSTALL_DIR:"*) return ;;
+  esac
+
+  if [ "${FUTU_CLI_NO_MODIFY_PATH:-}" = "1" ]; then
+    echo "Add $INSTALL_DIR to PATH before running $BINARY."
+    return
+  fi
+
+  profile="$(detect_profile)"
+  if [ -z "$profile" ]; then
+    echo "Add $INSTALL_DIR to PATH before running $BINARY."
+    return
+  fi
+
+  mkdir -p "$(dirname "$profile")"
+  touch "$profile"
+  if grep -Fq "$PATH_BLOCK_START" "$profile"; then
+    echo "$INSTALL_DIR is configured in $profile. Restart your shell before running $BINARY."
+    return
+  fi
+
+  {
+    echo ""
+    echo "$PATH_BLOCK_START"
+    path_export_line
+    echo "$PATH_BLOCK_END"
+  } >> "$profile"
+
+  echo "Added $INSTALL_DIR to PATH in $profile."
+  echo "Restart your shell or run: . $profile"
 }
 
 if [ -z "$VERSION" ]; then
@@ -100,7 +171,4 @@ cp "$TMP_DIR/unpack/$BINARY" "$INSTALL_DIR/$BINARY"
 chmod 0755 "$INSTALL_DIR/$BINARY"
 
 echo "$BINARY $VERSION installed to $INSTALL_DIR/$BINARY"
-case ":$PATH:" in
-  *":$INSTALL_DIR:"*) ;;
-  *) echo "Add $INSTALL_DIR to PATH before running $BINARY." ;;
-esac
+configure_path

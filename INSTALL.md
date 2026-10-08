@@ -33,6 +33,12 @@ sh scripts/install.sh
 ~/.futu/bin/futu
 ```
 
+安装脚本会自动把 `~/.futu/bin` 写入当前用户的 shell profile。首次安装后，重新打开终端，或按脚本提示执行 source 命令后即可直接运行：
+
+```bash
+futu version
+```
+
 指定安装目录：
 
 ```bash
