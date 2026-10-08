@@ -9,6 +9,8 @@ import (
 	"github.com/FutunnOpen/futu-cli/internal/service"
 )
 
+const cryptoFillTestTimestamp = int64(1747209825000000)
+
 func TestCryptoMutationOrderIDFallsBackToArgument(t *testing.T) {
 	got := cryptoMutationOrderID("FTHC3003082028640844800", &service.CryptoOrderResult{})
 
@@ -152,9 +154,10 @@ func TestCryptoFillSymbolReadsNestedSymbolPair(t *testing.T) {
 }
 
 func TestFormatCryptoFillTimeReadsFillTime(t *testing.T) {
-	fill := service.CryptoFill{"fill_time": float64(1747209825000000)}
+	fill := service.CryptoFill{"fill_time": float64(cryptoFillTestTimestamp)}
+	want := time.UnixMicro(cryptoFillTestTimestamp).Format("2006-01-02 15:04:05")
 
-	if got := formatCryptoFillTime(fill); got != "2025-05-14 16:03:45" {
+	if got := formatCryptoFillTime(fill); got != want {
 		t.Fatalf("time = %q", got)
 	}
 }
@@ -167,7 +170,7 @@ func TestSummarizeCryptoFillsByOrder(t *testing.T) {
 			"side":      "SELL",
 			"fill_qty":  "0.0004",
 			"amount":    "40",
-			"fill_time": float64(1747209825000000),
+			"fill_time": float64(cryptoFillTestTimestamp),
 		},
 		{
 			"order_id":  "O1",
