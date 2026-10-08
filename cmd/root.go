@@ -145,7 +145,8 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&outputFormat, "format", "f", formatTable,
 		"输出格式: table, json（默认: table）")
 	rootCmd.PersistentFlags().StringVar(&tokenFile, "token-file", "",
-		"OAuth token 加密文件路径（默认使用配置项 token_file）")
+		"OAuth token 加密文件路径")
+	_ = rootCmd.PersistentFlags().MarkHidden("token-file")
 }
 
 // initSharedState loads config, ensures auth (when needed), and initializes
@@ -226,7 +227,7 @@ func initOAuthClient() error {
 func newRequestReporter(token string) *reporting.Reporter {
 	requestReporter = reporting.NewReporter(reporting.Options{
 		Enabled: cfg.Telemetry,
-		Host:    reporting.DefaultHost,
+		Host:    cfg.ReportHost,
 		Token:   token,
 	})
 	return requestReporter

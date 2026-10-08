@@ -21,6 +21,12 @@ CLI 会自动访问：
 
 ## macOS / Linux
 
+推荐安装方式：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/FutunnOpen/futu-cli/main/scripts/install.sh | sh
+```
+
 在仓库内验证安装脚本：
 
 ```bash
@@ -59,7 +65,14 @@ FUTU_CLI_VERSION=v0.1.0-test.1 sh scripts/install.sh
 
 ## Windows
 
-在仓库内验证安装脚本：
+推荐安装方式：
+
+```powershell
+iwr -UseBasicParsing https://raw.githubusercontent.com/FutunnOpen/futu-cli/main/scripts/install.ps1 -OutFile install.ps1
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+在仓库内验证指定版本：
 
 ```powershell
 $env:FUTU_CLI_VERSION="v0.1.0-test.1"
@@ -74,7 +87,7 @@ powershell -ExecutionPolicy Bypass -File scripts/install.ps1
 
 ## npm
 
-当前占位包名：
+npm 包名：
 
 ```text
 @futunn/futu-cli
@@ -83,30 +96,40 @@ powershell -ExecutionPolicy Bypass -File scripts/install.ps1
 安装：
 
 ```bash
+npm install -g github:FutunnOpen/futu-cli
+```
+
+发布到 npm registry 后，也可以使用：
+
+```bash
 npm install -g @futunn/futu-cli
 ```
 
-npm 包版本必须和 Git tag 对齐。例如 npm `0.1.0` 下载 GitHub Release `v0.1.0`。
+npm wrapper 版本必须和 Git tag 对齐。例如 npm `0.1.0` 下载 GitHub Release `v0.1.0`。
 
 测试本地 npm wrapper 时可指定临时 Release 版本：
 
 ```bash
-FUTU_CLI_VERSION=v0.1.0-test.1 npm install -g ./npm
+FUTU_CLI_VERSION=v0.1.0-test.1 npm install -g .
 ```
 
 ## 发布链路
 
 发布使用 GitHub Actions 的 `Release` 手动 workflow，只发布正式 release。
 
-版本号可以手动填写，例如 `v0.1.0`。如果不填写，workflow 会读取 `npm/package.json` 的 `version`，自动生成对应 tag，例如 npm 版本 `0.1.0` 会发布 `v0.1.0`。
+版本号可以手动填写，例如 `v0.1.0`。如果不填写，workflow 会读取根目录 `package.json` 的 `version`，自动生成对应 tag，例如 npm 版本 `0.1.0` 会发布 `v0.1.0`。
 
 workflow 会执行：
 
 ```text
 go test ./...
 scripts/build-release.sh <version>
-gh release create <version> dist/*
+git tag -a <version> <current-commit>
+git push origin <version>
+gh release create <version> dist/* --verify-tag
 ```
+
+如果 tag 已经存在，workflow 会校验它是否指向当前提交；如果不是当前提交，会停止发布，避免源码 tag 和二进制 assets 对不上。
 
 验证正式版本下载：
 
@@ -133,7 +156,13 @@ futu update --force
 futu update --release-notes
 ```
 
-如果通过 npm 安装，推荐使用：
+如果通过 GitHub npm 安装，重新安装：
+
+```bash
+npm install -g github:FutunnOpen/futu-cli
+```
+
+发布到 npm registry 后，使用：
 
 ```bash
 npm update -g @futunn/futu-cli
@@ -164,8 +193,3 @@ npm uninstall -g @futunn/futu-cli
 ```bash
 rm -rf ~/.futu
 ```
-
-## TODO
-
-- TODO: npm License 确认后，更新 `npm/package.json`。
-- TODO: 安装脚本托管地址确定后，补充 `curl | sh` 入口。

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release tag, for example v0.1.0. Empty uses npm/package.json version."
+        description: "Release tag, for example v0.1.0. Empty uses package.json version."
         required: false
         type: string
       delete_existing:
@@ -39,7 +39,7 @@ jobs:
           version="${{ inputs.version }}"
 
           if [[ -z "$version" ]]; then
-            package_version="$(node -p "require('./npm/package.json').version")"
+            package_version="$(node -p "require('./package.json').version")"
             version="v${package_version}"
           fi
 
@@ -64,6 +64,30 @@ jobs:
           VERSION: ${{ steps.meta.outputs.version }}
         run: gh release delete "$VERSION" --cleanup-tag --yes || true
 
+      - name: Create release tag
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git fetch --force --prune --tags origin
+
+          if tag_sha="$(git rev-list -n 1 "$VERSION" 2>/dev/null)"; then
+            if [[ "$tag_sha" != "$GITHUB_SHA" ]]; then
+              echo "tag $VERSION points to $tag_sha, want $GITHUB_SHA" >&2
+              exit 1
+            fi
+
+            echo "tag $VERSION already points to $GITHUB_SHA"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$VERSION" "$GITHUB_SHA" -m "futu $VERSION"
+          git push origin "refs/tags/$VERSION"
+
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -75,7 +99,7 @@ jobs:
           gh release create \
             "$VERSION" \
             dist/* \
-            --target "$GITHUB_SHA" \
+            --verify-tag \
             --title "futu $VERSION" \
             --notes "Built from $GITHUB_SHA." \
             --latest

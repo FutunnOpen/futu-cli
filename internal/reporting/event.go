@@ -12,8 +12,7 @@ import (
 )
 
 const (
-	// TODO(reporting): replace this test host with the official reporting domain before public release.
-	DefaultHost = "test-report.futu-cli.com"
+	DefaultHost = "report.futunn.com"
 
 	DefaultQueueSize    = 256
 	DefaultRequestLimit = 2 * time.Second

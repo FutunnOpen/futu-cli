@@ -16,6 +16,7 @@ import (
 
 const (
 	envReportingIntegration = "FUTU_REPORTING_INTEGRATION"
+	envReportingHost        = "FUTU_REPORT_HOST"
 	integrationTimeout      = 10 * time.Second
 )
 
@@ -27,6 +28,10 @@ type reportToolCallResponse struct {
 func TestIntegrationReportToolCall(t *testing.T) {
 	if os.Getenv(envReportingIntegration) != "1" {
 		t.Skipf("set %s=1 to run real reporting endpoint integration test", envReportingIntegration)
+	}
+	reportHost := os.Getenv(envReportingHost)
+	if reportHost == "" {
+		t.Skipf("set %s to run real reporting endpoint integration test", envReportingHost)
 	}
 
 	cfg, err := config.Load()
@@ -56,7 +61,7 @@ func TestIntegrationReportToolCall(t *testing.T) {
 	}
 
 	client := &http.Client{Timeout: integrationTimeout}
-	req, err := http.NewRequest(http.MethodPost, ReportURL(DefaultHost), bytes.NewReader(payload))
+	req, err := http.NewRequest(http.MethodPost, ReportURL(reportHost), bytes.NewReader(payload))
 	if err != nil {
 		t.Fatalf("build request: %v", err)
 	}
