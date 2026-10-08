@@ -96,31 +96,9 @@ FUTU_CLI_VERSION=v0.1.0-test.1 npm install -g ./npm
 
 ## 发布链路
 
-发布使用 GitHub Actions 的 `Release` 手动 workflow，同一条链路支持测试 prerelease 和正式 release。
+发布使用 GitHub Actions 的 `Release` 手动 workflow，只发布正式 release。
 
-测试 prerelease：
-
-- `prerelease`: `true`
-- `version`: 可留空，默认创建：
-
-```text
-v0.1.0-test.<github-run-number>
-```
-
-也可以手动输入测试版本，例如：
-
-```text
-v0.1.0-test.1
-```
-
-正式 release：
-
-- `prerelease`: `false`
-- `version`: 必须填写正式版本，例如：
-
-```text
-v0.1.0
-```
+版本号可以手动填写，例如 `v0.1.0`。如果不填写，workflow 会读取 `npm/package.json` 的 `version`，自动生成对应 tag，例如 npm 版本 `0.1.0` 会发布 `v0.1.0`。
 
 workflow 会执行：
 
@@ -130,19 +108,11 @@ scripts/build-release.sh <version>
 gh release create <version> dist/*
 ```
 
-验证测试版本下载：
-
-```bash
-FUTU_CLI_VERSION=v0.1.0-test.1 sh scripts/install.sh
-```
-
 验证正式版本下载：
 
 ```bash
 sh scripts/install.sh
 ```
-
-临时测试版本验证结束后，可以在 GitHub Release 页面删除 prerelease，并删除对应 tag。
 
 ## 验证
 

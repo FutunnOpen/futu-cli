@@ -4,16 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release tag. Empty defaults to v0.1.0-test.<run_number> for prereleases."
+        description: "Release tag, for example v0.1.0. Empty uses npm/package.json version."
         required: false
         type: string
-      prerelease:
-        description: "Publish as a GitHub prerelease."
-        required: false
-        default: true
-        type: boolean
       delete_existing:
-        description: "Delete an existing release/tag with the same version before publishing."
+        description: "Delete an existing release/tag with the same version before publishing. Use only before public release."
         required: false
         default: false
         type: boolean
@@ -42,33 +37,19 @@ jobs:
           set -euo pipefail
 
           version="${{ inputs.version }}"
-          prerelease="${{ inputs.prerelease }}"
 
           if [[ -z "$version" ]]; then
-            if [[ "$prerelease" != "true" ]]; then
-              echo "version is required for a production release" >&2
-              exit 1
-            fi
-            version="v0.1.0-test.${GITHUB_RUN_NUMBER}"
+            package_version="$(node -p "require('./npm/package.json').version")"
+            version="v${package_version}"
           fi
 
-          if [[ ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+          if [[ ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "invalid version: $version" >&2
-            exit 1
-          fi
-
-          if [[ "$prerelease" == "true" && ! "$version" =~ - ]]; then
-            echo "prerelease versions must include a prerelease suffix, for example v0.1.0-test.1" >&2
-            exit 1
-          fi
-
-          if [[ "$prerelease" != "true" && "$version" =~ - ]]; then
-            echo "production release versions must not include a prerelease suffix" >&2
+            echo "production release versions must be vMAJOR.MINOR.PATCH, for example v0.1.0" >&2
             exit 1
           fi
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
 
       - name: Test
         run: go test ./...
@@ -87,23 +68,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.meta.outputs.version }}
-          PRERELEASE: ${{ steps.meta.outputs.prerelease }}
         shell: bash
         run: |
           set -euo pipefail
 
-          args=(
-            "$VERSION"
-            dist/*
-            --target "$GITHUB_SHA"
-            --title "futu $VERSION"
-            --notes "Built from $GITHUB_SHA."
-          )
-
-          if [[ "$PRERELEASE" == "true" ]]; then
-            args+=(--prerelease)
-          else
-            args+=(--latest)
-          fi
-
-          gh release create "${args[@]}"
+          gh release create \
+            "$VERSION" \
+            dist/* \
+            --target "$GITHUB_SHA" \
+            --title "futu $VERSION" \
+            --notes "Built from $GITHUB_SHA." \
+            --latest
