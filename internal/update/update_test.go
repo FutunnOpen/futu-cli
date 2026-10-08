@@ -105,3 +105,9 @@ func TestTagFromLocation(t *testing.T) {
 		t.Fatalf("tag = %q, want v1.2.3", got)
 	}
 }
+
+func TestTagFromLocationRejectsReleasesPage(t *testing.T) {
+	if _, err := tagFromLocation("https://github.com/owner/repo/releases"); err == nil {
+		t.Fatal("expected latest stable release error")
+	}
+}

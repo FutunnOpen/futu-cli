@@ -364,11 +364,16 @@ func tagFromLocation(location string) (string, error) {
 		return "", fmt.Errorf("missing latest release redirect location")
 	}
 	clean := strings.TrimRight(strings.Split(location, "?")[0], "/")
-	index := strings.LastIndex(clean, "/")
-	if index < 0 || index == len(clean)-1 {
+	const releaseTagPath = "/releases/tag/"
+	index := strings.LastIndex(clean, releaseTagPath)
+	if index < 0 {
+		return "", fmt.Errorf("latest stable release not found; GitHub /releases/latest ignores prereleases")
+	}
+	tag := clean[index+len(releaseTagPath):]
+	if len(tag) == 0 || strings.Contains(tag, "/") {
 		return "", fmt.Errorf("invalid latest release redirect location: %s", location)
 	}
-	return normalizeVersion(clean[index+1:]), nil
+	return normalizeVersion(tag), nil
 }
 
 func downloadFile(url, path string, timeout time.Duration) error {
