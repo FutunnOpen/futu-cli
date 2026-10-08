@@ -1,0 +1,18 @@
+{
+  "name": "@futunn/futu-cli",
+  "version": "0.1.0",
+  "description": "Futu command-line interface",
+  "bin": {
+    "futu": "bin/futu"
+  },
+  "scripts": {
+    "postinstall": "node scripts/install.js"
+  },
+  "files": [
+    "bin",
+    "scripts",
+    "vendor",
+    "README.md"
+  ],
+  "license": "UNLICENSED"
+}

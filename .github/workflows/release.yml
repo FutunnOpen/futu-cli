@@ -1,0 +1,109 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release tag. Empty defaults to v0.1.0-test.<run_number> for prereleases."
+        required: false
+        type: string
+      prerelease:
+        description: "Publish as a GitHub prerelease."
+        required: false
+        default: true
+        type: boolean
+      delete_existing:
+        description: "Delete an existing release/tag with the same version before publishing."
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version="${{ inputs.version }}"
+          prerelease="${{ inputs.prerelease }}"
+
+          if [[ -z "$version" ]]; then
+            if [[ "$prerelease" != "true" ]]; then
+              echo "version is required for a production release" >&2
+              exit 1
+            fi
+            version="v0.1.0-test.${GITHUB_RUN_NUMBER}"
+          fi
+
+          if [[ ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "invalid version: $version" >&2
+            exit 1
+          fi
+
+          if [[ "$prerelease" == "true" && ! "$version" =~ - ]]; then
+            echo "prerelease versions must include a prerelease suffix, for example v0.1.0-test.1" >&2
+            exit 1
+          fi
+
+          if [[ "$prerelease" != "true" && "$version" =~ - ]]; then
+            echo "production release versions must not include a prerelease suffix" >&2
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build release assets
+        run: scripts/build-release.sh "${{ steps.meta.outputs.version }}"
+
+      - name: Delete existing release
+        if: ${{ inputs.delete_existing }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: gh release delete "$VERSION" --cleanup-tag --yes || true
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          PRERELEASE: ${{ steps.meta.outputs.prerelease }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          args=(
+            "$VERSION"
+            dist/*
+            --target "$GITHUB_SHA"
+            --title "futu $VERSION"
+            --notes "Built from $GITHUB_SHA."
+          )
+
+          if [[ "$PRERELEASE" == "true" ]]; then
+            args+=(--prerelease)
+          else
+            args+=(--latest)
+          fi
+
+          gh release create "${args[@]}"

@@ -1,0 +1,7 @@
+.local_docs/
+/skills/
+/npm/vendor/
+/dist/
+*.log
+[Tt][Oo][Dd][Oo].md
+/v[0-9]*/
