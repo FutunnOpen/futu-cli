@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -110,6 +111,27 @@ func TestTradeMutationEndpointMatrixRequiresReportSource(t *testing.T) {
 			t.Fatalf("%s must not require report source header", endpoint)
 		}
 	}
+}
+
+func TestReportingRoutesCoverTrackedEndpoints(t *testing.T) {
+	for endpoint, route := range Endpoints {
+		if !isTrackedReportingEndpoint(endpoint) {
+			continue
+		}
+		toolRoute := reporting.MatchToolRoute(route.Method, route.Path)
+		if toolRoute.ID == "" {
+			t.Fatalf("%s (%s %s) has no reporting route", endpoint, route.Method, route.Path)
+		}
+	}
+}
+
+func isTrackedReportingEndpoint(endpoint string) bool {
+	for _, prefix := range []string{"quote.", "sim_trade.", "trade.", "crypto."} {
+		if strings.HasPrefix(endpoint, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func TestCallAddsReportSourceForTradeMutations(t *testing.T) {

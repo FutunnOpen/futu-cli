@@ -55,6 +55,9 @@ func init() {
 		panic(err)
 	}
 	for i := range specs {
+		if specs[i].Group == simGroupID {
+			continue
+		}
 		rootCmd.AddCommand(newQuoteRESTCommand(&specs[i]))
 	}
 }
