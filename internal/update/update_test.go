@@ -2,6 +2,7 @@ package update
 
 import (
 	"bytes"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -63,6 +64,28 @@ func TestCheckUsesGitHubLatestReleaseRedirect(t *testing.T) {
 	}
 	if info.ReleaseNotes != server.URL+"/releases/tag/v0.2.0" {
 		t.Fatalf("ReleaseNotes = %q", info.ReleaseNotes)
+	}
+}
+
+func TestCheckHandlesMissingLatestRelease(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/releases/latest" {
+			t.Fatalf("path = %s, want /releases/latest", r.URL.Path)
+		}
+		http.Redirect(w, r, "/owner/repo/releases", http.StatusFound)
+	}))
+	defer server.Close()
+	t.Setenv(envReleaseBase, server.URL)
+
+	info, err := Check("v0.1.0-test.local")
+	if err != nil {
+		t.Fatalf("Check() error = %v", err)
+	}
+	if info.Available {
+		t.Fatal("expected no update without a latest release")
+	}
+	if info.LatestVersion != "v0.1.0-test.local" {
+		t.Fatalf("LatestVersion = %q, want current version", info.LatestVersion)
 	}
 }
 
@@ -158,6 +181,13 @@ func TestTagFromLocation(t *testing.T) {
 	}
 	if got != "v1.2.3" {
 		t.Fatalf("tag = %q, want v1.2.3", got)
+	}
+}
+
+func TestTagFromLocationTreatsReleaseListAsMissingLatest(t *testing.T) {
+	_, err := tagFromLocation("https://github.com/owner/repo/releases")
+	if !errors.Is(err, errNoLatestRelease) {
+		t.Fatalf("error = %v, want errNoLatestRelease", err)
 	}
 }
 

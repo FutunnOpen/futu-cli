@@ -46,10 +46,13 @@ const (
 	linuxLibcGlibc      = "glibc"
 	archiveExtTarGzip   = "tar.gz"
 	archiveExtZip       = "zip"
+	releaseTagPath      = "/releases/tag/"
 	windowsExecutable   = ".exe"
 	npmInstallHint      = "This CLI was installed by npm. Run `npm update -g @futunn/futu-cli` to upgrade."
 	homebrewInstallHint = "This CLI appears to be managed by Homebrew. Run `brew upgrade futu` to upgrade."
 )
+
+var errNoLatestRelease = errors.New("no latest release")
 
 // UpdateInfo holds the result of a version check against the release source.
 type UpdateInfo struct {
@@ -79,6 +82,9 @@ var stderrIsTerminal = defaultStderrIsTerminal
 func Check(currentVersion string) (*UpdateInfo, error) {
 	latest, cfg, err := fetchLatestVersion(context.Background(), downloadTimeout)
 	if err != nil {
+		if errors.Is(err, errNoLatestRelease) {
+			return buildNoUpdateInfo(currentVersion), nil
+		}
 		return nil, err
 	}
 	return buildUpdateInfo(currentVersion, latest, cfg)
@@ -220,6 +226,15 @@ func buildUpdateInfo(currentVersion, latest string, cfg releaseConfig) (*UpdateI
 		ReleaseNotes:   cfg.releaseNotesURL(latest),
 		Available:      available,
 	}, nil
+}
+
+func buildNoUpdateInfo(currentVersion string) *UpdateInfo {
+	current := normalizeVersion(currentVersion)
+	return &UpdateInfo{
+		CurrentVersion: current,
+		LatestVersion:  current,
+		Available:      false,
+	}
 }
 
 func fetchLatestVersion(ctx context.Context, timeout time.Duration) (string, releaseConfig, error) {
@@ -368,11 +383,15 @@ func tagFromLocation(location string) (string, error) {
 		return "", fmt.Errorf("missing latest release redirect location")
 	}
 	clean := strings.TrimRight(strings.Split(location, "?")[0], "/")
-	index := strings.LastIndex(clean, "/")
-	if index < 0 || index == len(clean)-1 {
+	index := strings.LastIndex(clean, releaseTagPath)
+	if index < 0 {
+		return "", errNoLatestRelease
+	}
+	tag := strings.Trim(clean[index+len(releaseTagPath):], "/")
+	if len(tag) == 0 || strings.Contains(tag, "/") {
 		return "", fmt.Errorf("invalid latest release redirect location: %s", location)
 	}
-	return normalizeVersion(clean[index+1:]), nil
+	return normalizeVersion(tag), nil
 }
 
 func downloadFile(url, path string, timeout time.Duration) error {
