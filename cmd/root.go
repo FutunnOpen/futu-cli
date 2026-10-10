@@ -211,7 +211,11 @@ func initOAuthClient() error {
 		return clientIDAPIBaseMismatchError()
 	}
 
-	token, err := auth.EnsureValid(cfg.ClientID, effectiveTokenFile())
+	oauthBaseURL, err := currentOAuthBaseURL()
+	if err != nil {
+		return err
+	}
+	token, err := auth.EnsureValidWithBaseURL(oauthBaseURL, cfg.ClientID, effectiveTokenFile())
 	if err != nil {
 		return fmt.Errorf("authentication required: %w\nRun 'futu auth login' to authenticate", err)
 	}

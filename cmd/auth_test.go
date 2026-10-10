@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -40,7 +41,10 @@ func TestEnsureClientIDRegistersWhenAPIBaseHostChanges(t *testing.T) {
 		RedirectURI:     "http://127.0.0.1:18888/callback",
 		TokenFile:       t.TempDir() + "/token.json",
 	}
-	registerOAuthClient = func(_ string, redirectURIs []string) (*auth.RegistrationResponse, error) {
+	registerOAuthClient = func(baseURL, _ string, redirectURIs []string) (*auth.RegistrationResponse, error) {
+		if baseURL != "https://uat-webapi.futunn.com" {
+			t.Fatalf("baseURL = %q, want https://uat-webapi.futunn.com", baseURL)
+		}
 		if len(redirectURIs) != 1 || redirectURIs[0] != cfg.RedirectURI {
 			t.Fatalf("redirect URIs = %#v", redirectURIs)
 		}
@@ -73,7 +77,10 @@ func TestEnsureClientIDRegistersWhenAPIBaseHostIsMissing(t *testing.T) {
 		RedirectURI: "http://127.0.0.1:18888/callback",
 		TokenFile:   t.TempDir() + "/token.json",
 	}
-	registerOAuthClient = func(_ string, redirectURIs []string) (*auth.RegistrationResponse, error) {
+	registerOAuthClient = func(baseURL, _ string, redirectURIs []string) (*auth.RegistrationResponse, error) {
+		if baseURL != "https://webapi.futunn.com" {
+			t.Fatalf("baseURL = %q, want https://webapi.futunn.com", baseURL)
+		}
 		if len(redirectURIs) != 1 || redirectURIs[0] != cfg.RedirectURI {
 			t.Fatalf("redirect URIs = %#v", redirectURIs)
 		}
@@ -103,6 +110,25 @@ func TestAPIBaseHostNormalizesSchemePortAndPath(t *testing.T) {
 	}
 	if got != "webapi.futunn.com" {
 		t.Fatalf("host = %q, want webapi.futunn.com", got)
+	}
+}
+
+func TestAuthorizationURLUsesConfiguredAPIBase(t *testing.T) {
+	previousConfig := cfg
+	cfg = &config.Config{APIBase: "https://uat-webapi.futunn.com/api/v1.0"}
+	t.Cleanup(func() { cfg = previousConfig })
+
+	request := &authorizationRequest{
+		ClientID:    "cid-001",
+		RedirectURI: "http://127.0.0.1:18888/callback",
+		State:       "state-abc",
+		PKCE:        &auth.PKCEParams{CodeChallenge: "challenge123", Method: "S256"},
+	}
+	if err := assignAuthorizationURL(request); err != nil {
+		t.Fatalf("assignAuthorizationURL() error = %v", err)
+	}
+	if !strings.HasPrefix(request.URL, "https://uat-webapi.futunn.com/oauth2/authorize/confirm?") {
+		t.Fatalf("authorization URL = %q", request.URL)
 	}
 }
 

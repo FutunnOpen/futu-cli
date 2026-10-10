@@ -113,7 +113,7 @@ func (t *TokenStore) IsExpired() bool {
 // EnsureValid loads the stored token, refreshes it if expired, and returns
 // a valid access token. This is intended for use in cobra PreRun hooks.
 func EnsureValid(clientID, path string) (string, error) {
-	store, err := EnsureValidStore(clientID, path)
+	store, err := EnsureValidStoreWithBaseURL(defaultOAuthBaseURL, clientID, path)
 	if err != nil {
 		return "", err
 	}
@@ -123,6 +123,22 @@ func EnsureValid(clientID, path string) (string, error) {
 // EnsureValidStore loads the stored token, refreshes it if expired, persists
 // the refreshed token, and returns the usable token store.
 func EnsureValidStore(clientID, path string) (*TokenStore, error) {
+	return EnsureValidStoreWithBaseURL(defaultOAuthBaseURL, clientID, path)
+}
+
+// EnsureValidWithBaseURL loads a valid access token using a specific OAuth
+// base URL for refresh requests.
+func EnsureValidWithBaseURL(baseURL, clientID, path string) (string, error) {
+	store, err := EnsureValidStoreWithBaseURL(baseURL, clientID, path)
+	if err != nil {
+		return "", err
+	}
+	return store.AccessToken, nil
+}
+
+// EnsureValidStoreWithBaseURL loads the stored token and refreshes it against
+// a specific OAuth base URL when expired.
+func EnsureValidStoreWithBaseURL(baseURL, clientID, path string) (*TokenStore, error) {
 	store, err := LoadToken(path)
 	if err != nil {
 		return nil, fmt.Errorf("no stored token: %w", err)
@@ -130,15 +146,23 @@ func EnsureValidStore(clientID, path string) (*TokenStore, error) {
 	if !store.IsExpired() {
 		return store, nil
 	}
-	return RefreshStoredToken(resolveClientID(clientID, store), path, store)
+	return RefreshStoredTokenWithBaseURL(baseURL, resolveClientID(clientID, store), path, store)
 }
 
 // RefreshStoredToken refreshes a loaded token store and persists the new token.
 func RefreshStoredToken(clientID, path string, store *TokenStore) (*TokenStore, error) {
+	return RefreshStoredTokenWithBaseURL(defaultOAuthBaseURL, clientID, path, store)
+}
+
+// RefreshStoredTokenWithBaseURL refreshes a loaded token store using a
+// specific OAuth base URL and persists the new token.
+func RefreshStoredTokenWithBaseURL(
+	baseURL, clientID, path string, store *TokenStore,
+) (*TokenStore, error) {
 	if len(store.RefreshToken) == 0 {
 		return nil, errors.New(missingRefreshTokenMessage)
 	}
-	resp, err := RefreshAccessToken(clientID, store.RefreshToken)
+	resp, err := RefreshAccessTokenWithBaseURL(baseURL, clientID, store.RefreshToken)
 	if err != nil {
 		return nil, fmt.Errorf("refresh token: %w", err)
 	}

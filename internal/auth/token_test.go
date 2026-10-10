@@ -143,8 +143,8 @@ func TestBuildUpdatedStore(t *testing.T) {
 func TestEnsureValidStoreRefreshesExpiredToken(t *testing.T) {
 	previousClient := oauthHTTPClient
 	oauthHTTPClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
-		if req.URL.String() != oauthBaseURL+tokenURL {
-			t.Fatalf("refresh URL = %q, want %q", req.URL.String(), oauthBaseURL+tokenURL)
+		if req.URL.String() != defaultOAuthBaseURL+tokenURL {
+			t.Fatalf("refresh URL = %q, want %q", req.URL.String(), defaultOAuthBaseURL+tokenURL)
 		}
 		if err := req.ParseForm(); err != nil {
 			t.Fatalf("parse form: %v", err)

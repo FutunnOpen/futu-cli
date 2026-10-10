@@ -54,7 +54,7 @@ var (
 	noBrowserFlag  bool
 )
 
-var registerOAuthClient = auth.RegisterClient
+var registerOAuthClient = auth.RegisterClientWithBaseURL
 
 var authCmd = &cobra.Command{Use: "auth", Short: "Manage OAuth2 authentication"}
 var loginCmd = &cobra.Command{Use: "login", Short: "Sign in with OAuth2", RunE: runLogin}
@@ -104,7 +104,11 @@ func useExistingToken(path string) bool {
 	if len(clientID) == 0 {
 		clientID = store.ClientID
 	}
-	if _, err := auth.EnsureValid(clientID, path); err != nil {
+	oauthBaseURL, err := currentOAuthBaseURL()
+	if err != nil {
+		return false
+	}
+	if _, err := auth.EnsureValidWithBaseURL(oauthBaseURL, clientID, path); err != nil {
 		fmt.Fprintf(os.Stderr, "Existing token refresh failed; starting a new authorization: %v\n", err)
 		return false
 	}
@@ -128,6 +132,9 @@ func startLocalLogin(path string) error {
 	}
 	request, err := newAuthorizationRequest(clientID, redirectURI)
 	if err != nil {
+		return err
+	}
+	if err := assignAuthorizationURL(request); err != nil {
 		return err
 	}
 	if err := presentAuthorizationURL(request.URL); err != nil {
@@ -166,8 +173,22 @@ func newAuthorizationRequest(clientID, redirectURI string) (*authorizationReques
 	}
 	return &authorizationRequest{
 		ClientID: clientID, RedirectURI: redirectURI, State: state, PKCE: pkce,
-		URL: auth.BuildAuthorizationURL(clientID, redirectURI, pkce, state),
+		URL: "",
 	}, nil
+}
+
+func assignAuthorizationURL(request *authorizationRequest) error {
+	oauthBaseURL, err := currentOAuthBaseURL()
+	if err != nil {
+		return err
+	}
+	request.URL, err = auth.BuildAuthorizationURLWithBaseURL(
+		oauthBaseURL, request.ClientID, request.RedirectURI, request.PKCE, request.State,
+	)
+	if err != nil {
+		return fmt.Errorf("build authorization URL: %w", err)
+	}
+	return nil
 }
 
 func presentAuthorizationURL(authURL string) error {
@@ -249,9 +270,11 @@ func exchangeAndSave(result *auth.CallbackResult, request *authorizationRequest,
 	if result.State != request.State {
 		return fmt.Errorf("state validation failed; possible CSRF attack")
 	}
-	response, err := auth.ExchangeCode(
-		request.ClientID, result.Code, request.RedirectURI, request.PKCE.CodeVerifier,
-	)
+	oauthBaseURL, err := currentOAuthBaseURL()
+	if err != nil {
+		return err
+	}
+	response, err := auth.ExchangeCodeWithBaseURL(oauthBaseURL, request.ClientID, result.Code, request.RedirectURI, request.PKCE.CodeVerifier)
 	if err != nil {
 		return fmt.Errorf("exchange code: %w", err)
 	}
@@ -270,7 +293,11 @@ func registerAndSaveClientID(redirectURIs []string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	response, err := registerOAuthClient(auth.BuildClientName(clientNameFlag), redirectURIs)
+	oauthBaseURL, err := currentOAuthBaseURL()
+	if err != nil {
+		return "", err
+	}
+	response, err := registerOAuthClient(oauthBaseURL, auth.BuildClientName(clientNameFlag), redirectURIs)
 	if err != nil {
 		return "", fmt.Errorf("client registration: %w", err)
 	}
@@ -305,6 +332,13 @@ func currentAPIBaseHost() (string, error) {
 		return "", fmt.Errorf("configuration not loaded; please check your config file")
 	}
 	return apiBaseHost(cfg.APIBase)
+}
+
+func currentOAuthBaseURL() (string, error) {
+	if cfg == nil {
+		return "", fmt.Errorf("configuration not loaded; please check your config file")
+	}
+	return auth.OAuthBaseOrigin(cfg.APIBase)
 }
 
 func apiBaseHost(value string) (string, error) {
@@ -483,7 +517,11 @@ func refreshTokenIfExpired(path string, store *auth.TokenStore) (*auth.TokenStor
 	if err != nil {
 		return nil, err
 	}
-	return auth.RefreshStoredToken(clientID, path, store)
+	oauthBaseURL, err := currentOAuthBaseURL()
+	if err != nil {
+		return nil, err
+	}
+	return auth.RefreshStoredTokenWithBaseURL(oauthBaseURL, clientID, path, store)
 }
 
 func statusRefreshClientID(store *auth.TokenStore) (string, error) {
