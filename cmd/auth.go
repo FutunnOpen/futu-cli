@@ -310,6 +310,9 @@ func registerAndSaveClientID(redirectURIs []string) (string, error) {
 	if err := cfg.Set(config.KeyClientIDAPIBase, apiBaseHost); err != nil {
 		return "", fmt.Errorf("set client_id_api_base: %w", err)
 	}
+	if err := cfg.Set(config.KeyClientIDOAuthBase, oauthBaseURL); err != nil {
+		return "", fmt.Errorf("set client_id_oauth_base: %w", err)
+	}
 	if err := cfg.Save(); err != nil {
 		return "", fmt.Errorf("save config: %w", err)
 	}
@@ -317,14 +320,19 @@ func registerAndSaveClientID(redirectURIs []string) (string, error) {
 }
 
 func clientIDMatchesCurrentAPIBase() bool {
-	if cfg == nil || len(cfg.ClientID) == 0 || len(cfg.ClientIDAPIBase) == 0 {
+	if cfg == nil || len(cfg.ClientID) == 0 || len(cfg.ClientIDAPIBase) == 0 || len(cfg.ClientIDOAuthBase) == 0 {
 		return false
 	}
 	apiBaseHost, err := currentAPIBaseHost()
 	if err != nil {
 		return false
 	}
-	return strings.EqualFold(cfg.ClientIDAPIBase, apiBaseHost)
+	oauthBaseURL, err := currentOAuthBaseURL()
+	if err != nil {
+		return false
+	}
+	return strings.EqualFold(cfg.ClientIDAPIBase, apiBaseHost) &&
+		strings.EqualFold(cfg.ClientIDOAuthBase, oauthBaseURL)
 }
 
 func currentAPIBaseHost() (string, error) {
@@ -365,14 +373,24 @@ func clientIDAPIBaseMismatchError() error {
 	if err != nil {
 		return err
 	}
+	currentOAuthBase, err := currentOAuthBaseURL()
+	if err != nil {
+		return err
+	}
 	registeredHost := cfg.ClientIDAPIBase
 	if len(registeredHost) == 0 {
 		registeredHost = "unknown"
 	}
+	registeredOAuthBase := cfg.ClientIDOAuthBase
+	if len(registeredOAuthBase) == 0 {
+		registeredOAuthBase = "unknown"
+	}
 	return fmt.Errorf(
-		"client_id is registered for api_base host %q, current api_base host is %q\nRun 'futu auth login' to register a client_id for the current api_base",
+		"client_id is registered for api_base host %q and OAuth base %q, current api_base host is %q and OAuth base is %q\nRun 'futu auth login' to register a client_id for the current api_base",
 		registeredHost,
+		registeredOAuthBase,
 		currentHost,
+		currentOAuthBase,
 	)
 }
 

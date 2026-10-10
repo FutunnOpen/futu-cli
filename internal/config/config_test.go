@@ -23,3 +23,14 @@ func TestClientIDAPIBaseConfigRoundTrip(t *testing.T) {
 		t.Fatalf("client_id_api_base = %q", got)
 	}
 }
+
+func TestClientIDOAuthBaseConfigRoundTrip(t *testing.T) {
+	cfg := DefaultConfig()
+
+	if err := cfg.Set(KeyClientIDOAuthBase, "https://webapi.futunn.com"); err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
+	if got := cfg.Get(KeyClientIDOAuthBase); got != "https://webapi.futunn.com" {
+		t.Fatalf("client_id_oauth_base = %q", got)
+	}
+}

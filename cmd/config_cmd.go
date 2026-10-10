@@ -14,6 +14,7 @@ var allConfigKeys = []string{
 	config.KeyAPIBase,
 	config.KeyClientID,
 	config.KeyClientIDAPIBase,
+	config.KeyClientIDOAuthBase,
 	config.KeyRedirectURI,
 	config.KeyTokenFile,
 	config.KeyDefaultAcct,

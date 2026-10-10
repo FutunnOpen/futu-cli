@@ -23,24 +23,26 @@ const (
 
 // Config field key names used by Get/Set.
 const (
-	KeyAPIBase         = "api_base"
-	KeyClientID        = "client_id"
-	KeyClientIDAPIBase = "client_id_api_base"
-	KeyRedirectURI     = "redirect_uri"
-	KeyTokenFile       = "token_file"
-	KeyDefaultAcct     = "default_account"
-	KeyAutoUpdate      = "auto_update"
+	KeyAPIBase           = "api_base"
+	KeyClientID          = "client_id"
+	KeyClientIDAPIBase   = "client_id_api_base"
+	KeyClientIDOAuthBase = "client_id_oauth_base"
+	KeyRedirectURI       = "redirect_uri"
+	KeyTokenFile         = "token_file"
+	KeyDefaultAcct       = "default_account"
+	KeyAutoUpdate        = "auto_update"
 )
 
 // Config holds the CLI configuration.
 type Config struct {
-	APIBase         string `json:"api_base"`
-	ClientID        string `json:"client_id,omitempty"`
-	ClientIDAPIBase string `json:"client_id_api_base,omitempty"`
-	RedirectURI     string `json:"redirect_uri,omitempty"`
-	TokenFile       string `json:"token_file"`
-	DefaultAcct     string `json:"default_account"`
-	AutoUpdate      bool   `json:"auto_update"`
+	APIBase           string `json:"api_base"`
+	ClientID          string `json:"client_id,omitempty"`
+	ClientIDAPIBase   string `json:"client_id_api_base,omitempty"`
+	ClientIDOAuthBase string `json:"client_id_oauth_base,omitempty"`
+	RedirectURI       string `json:"redirect_uri,omitempty"`
+	TokenFile         string `json:"token_file"`
+	DefaultAcct       string `json:"default_account"`
+	AutoUpdate        bool   `json:"auto_update"`
 }
 
 // DefaultConfig returns a Config populated with sensible defaults.
@@ -141,6 +143,8 @@ func (c *Config) Get(key string) string {
 		return c.ClientID
 	case KeyClientIDAPIBase:
 		return c.ClientIDAPIBase
+	case KeyClientIDOAuthBase:
+		return c.ClientIDOAuthBase
 	case KeyRedirectURI:
 		return c.RedirectURI
 	case KeyTokenFile:
@@ -163,6 +167,8 @@ func (c *Config) Set(key, value string) error {
 		c.ClientID = value
 	case KeyClientIDAPIBase:
 		c.ClientIDAPIBase = value
+	case KeyClientIDOAuthBase:
+		c.ClientIDOAuthBase = value
 	case KeyRedirectURI:
 		c.RedirectURI = value
 	case KeyTokenFile:

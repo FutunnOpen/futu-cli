@@ -96,12 +96,13 @@ Common keys:
 api_base
 client_id
 client_id_api_base
+client_id_oauth_base
 redirect_uri
 default_account
 auto_update
 ```
 
-`client_id` is bound to the host portion of `api_base`. If `api_base` is changed to a different host, `futu auth login` registers and saves a new `client_id` instead of reusing the old one.
+`client_id` is bound to both `client_id_api_base` and `client_id_oauth_base`. If either binding is missing or does not match the current `api_base`, `futu auth login` registers and saves a new `client_id` instead of reusing the old one.
 
 ## Commands
 
