@@ -1,6 +1,7 @@
 package update
 
 import (
+	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -90,6 +91,58 @@ func TestRefreshCacheSkipsDevVersion(t *testing.T) {
 	}
 }
 
+func TestRefreshCacheSkipsLocalVersion(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv(envReleaseBase, "")
+
+	RefreshCacheIfStale("v0.1.0-test.local")
+	if _, err := os.Stat(filepath.Join(home, ".futu", latestCacheFile)); !os.IsNotExist(err) {
+		t.Fatalf("latest cache was created: %v", err)
+	}
+}
+
+func TestNotifyIfAvailableLabelsCurrentAndLatestVersions(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv(envReleaseBase, "https://example.com/owner/repo")
+	previousTerminal := stderrIsTerminal
+	stderrIsTerminal = func() bool { return true }
+	t.Cleanup(func() { stderrIsTerminal = previousTerminal })
+	if err := writeVersionFile(latestCachePath(), "v0.2.0"); err != nil {
+		t.Fatalf("write latest cache: %v", err)
+	}
+
+	output := captureStderr(t, func() {
+		NotifyIfAvailable("v0.1.0")
+	})
+	if !strings.Contains(output, "New version available: v0.1.0 -> v0.2.0.") {
+		t.Fatalf("missing update range in output: %q", output)
+	}
+	if !strings.Contains(output, "Release notes (v0.2.0): https://example.com/owner/repo/releases/tag/v0.2.0") {
+		t.Fatalf("missing labeled release notes in output: %q", output)
+	}
+}
+
+func TestNotifyIfAvailableSkipsLocalVersion(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv(envReleaseBase, "https://example.com/owner/repo")
+	previousTerminal := stderrIsTerminal
+	stderrIsTerminal = func() bool { return true }
+	t.Cleanup(func() { stderrIsTerminal = previousTerminal })
+	if err := writeVersionFile(latestCachePath(), "v0.1.0"); err != nil {
+		t.Fatalf("write latest cache: %v", err)
+	}
+
+	output := captureStderr(t, func() {
+		NotifyIfAvailable("v0.1.0-test.local")
+	})
+	if len(output) > 0 {
+		t.Fatalf("expected no update notice for local version, got %q", output)
+	}
+}
+
 func TestFindChecksum(t *testing.T) {
 	content := "abc123  futu_v0.1.0_darwin_arm64.tar.gz\n"
 	got := findChecksum(content, "futu_v0.1.0_darwin_arm64.tar.gz")
@@ -106,4 +159,29 @@ func TestTagFromLocation(t *testing.T) {
 	if got != "v1.2.3" {
 		t.Fatalf("tag = %q, want v1.2.3", got)
 	}
+}
+
+func captureStderr(t *testing.T, fn func()) string {
+	t.Helper()
+	original := os.Stderr
+	readEnd, writeEnd, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe stderr: %v", err)
+	}
+	os.Stderr = writeEnd
+
+	fn()
+
+	os.Stderr = original
+	if err := writeEnd.Close(); err != nil {
+		t.Fatalf("close stderr writer: %v", err)
+	}
+	var buffer bytes.Buffer
+	if _, err := buffer.ReadFrom(readEnd); err != nil {
+		t.Fatalf("read stderr: %v", err)
+	}
+	if err := readEnd.Close(); err != nil {
+		t.Fatalf("close stderr reader: %v", err)
+	}
+	return buffer.String()
 }

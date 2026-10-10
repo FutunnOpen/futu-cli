@@ -72,6 +72,8 @@ type assetInfo struct {
 	Ext  string
 }
 
+var stderrIsTerminal = defaultStderrIsTerminal
+
 // Check queries the GitHub latest release redirect to determine whether a newer
 // version exists.
 func Check(currentVersion string) (*UpdateInfo, error) {
@@ -130,9 +132,11 @@ func NotifyIfAvailable(currentVersion string) {
 		return
 	}
 	if newer, err := isVersionNewer(latest, currentVersion); err == nil && newer {
-		fmt.Fprintf(os.Stderr, "New version %s is available, run `futu update` to update.\n", latest)
+		current := normalizeVersion(currentVersion)
+		latest = normalizeVersion(latest)
+		fmt.Fprintf(os.Stderr, "New version available: %s -> %s. Run `futu update` to update.\n", current, latest)
 		if url := releaseNotesURLForVersion(latest); len(url) > 0 {
-			fmt.Fprintf(os.Stderr, "Release notes: %s\n", url)
+			fmt.Fprintf(os.Stderr, "Release notes (%s): %s\n", latest, url)
 		}
 	}
 }
@@ -149,8 +153,9 @@ func NotifyReleaseNotesIfVersionChanged(currentVersion string) {
 	if len(previous) == 0 || previous == normalizeVersion(currentVersion) {
 		return
 	}
-	if url := releaseNotesURLForVersion(currentVersion); len(url) > 0 {
-		fmt.Fprintf(os.Stderr, "Release notes: %s\n", url)
+	current := normalizeVersion(currentVersion)
+	if url := releaseNotesURLForVersion(current); len(url) > 0 {
+		fmt.Fprintf(os.Stderr, "Release notes (%s): %s\n", current, url)
 	}
 }
 
@@ -696,10 +701,11 @@ func normalizeVersion(version string) string {
 }
 
 func skipVersionCheck(currentVersion string) bool {
-	return len(normalizeVersion(currentVersion)) == 0 || normalizeVersion(currentVersion) == "dev"
+	version := normalizeVersion(currentVersion)
+	return len(version) == 0 || version == "dev" || strings.Contains(version, ".local")
 }
 
-func stderrIsTerminal() bool {
+func defaultStderrIsTerminal() bool {
 	info, err := os.Stderr.Stat()
 	return err == nil && (info.Mode()&os.ModeCharDevice) != 0
 }
