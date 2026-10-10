@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	_ "embed"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -18,56 +17,436 @@ import (
 	"github.com/futunn/futu/pkg/symbol"
 )
 
-//go:embed quote_rest_specs.json
-var quoteRESTSpecsJSON []byte
-
 // quoteRESTSpec is one BFF quote API registered as a CLI command.
 type quoteRESTSpec struct {
-	ID         string           `json:"id"`
-	Cmd        string           `json:"cmd"`
-	Group      string           `json:"group"`
-	Path       string           `json:"path"`
-	Method     string           `json:"method"`
-	Wrap       string           `json:"wrap"`
-	Short      string           `json:"short"`
-	Positional string           `json:"positional"`
-	Extra      string           `json:"extra"`
-	Keyword    bool             `json:"keyword"`
-	Params     []quoteRESTParam `json:"params"`
+	ID         string
+	Cmd        string
+	Group      string
+	Path       string
+	Method     string
+	Wrap       string
+	Positional string
+	Extra      string
+	Params     []quoteRESTParam
 }
 
 type quoteRESTParam struct {
-	Name     string `json:"name"`
-	Type     string `json:"type"`
-	Kind     string `json:"kind"`
-	Required bool   `json:"required"`
-	Default  string `json:"default"`
-	Source   string `json:"source"`
-	Desc     string `json:"desc"`
-	Enum     string `json:"enum"`
-	Pattern  string `json:"pattern"`
-	Format   string `json:"format"`
+	Name     string
+	Kind     string
+	Required bool
+	Default  string
+	Source   string
+	Enum     string
 }
 
 func init() {
-	specs, err := loadQuoteRESTSpecs()
-	if err != nil {
-		panic(err)
-	}
+	specs := loadQuoteRESTSpecs()
+	registered := registerQuoteRESTAggregateCommands(specs)
 	for i := range specs {
-		if specs[i].Group == simGroupID {
+		if registered[specs[i].Cmd] || specs[i].Group == simGroupID {
 			continue
 		}
 		rootCmd.AddCommand(newQuoteRESTCommand(&specs[i]))
 	}
 }
 
-func loadQuoteRESTSpecs() ([]quoteRESTSpec, error) {
-	var specs []quoteRESTSpec
-	if err := json.Unmarshal(quoteRESTSpecsJSON, &specs); err != nil {
-		return nil, fmt.Errorf("parse quote REST specs: %w", err)
+func loadQuoteRESTSpecs() []quoteRESTSpec {
+	return quoteRESTSpecs
+}
+
+type quoteRESTAggregate struct {
+	Cmd             string
+	Use             string
+	Short           string
+	SelectorFlag    string
+	SelectorDefault string
+	Variants        []quoteRESTVariant
+}
+
+type quoteRESTVariant struct {
+	Value string
+	Cmd   string
+}
+
+var quoteRESTAggregates = []quoteRESTAggregate{
+	{
+		Cmd:             "broker",
+		Use:             "broker <symbol>",
+		Short:           "Get broker-tracking data",
+		SelectorFlag:    "view",
+		SelectorDefault: "current",
+		Variants: []quoteRESTVariant{
+			{Value: "current", Cmd: "top-ten-brokers"},
+			{Value: "history", Cmd: "top-ten-brokers-history"},
+		},
+	},
+	{
+		Cmd:             "capital",
+		Use:             "capital <symbol>",
+		Short:           "Get capital-flow data",
+		SelectorFlag:    "view",
+		SelectorDefault: "intraday",
+		Variants: []quoteRESTVariant{
+			{Value: "intraday", Cmd: "capital-flow"},
+			{Value: "history", Cmd: "capital-flow-history"},
+			{Value: "distribution", Cmd: "capital-distribution"},
+		},
+	},
+	{
+		Cmd:             "company",
+		Use:             "company <symbol> [leader]",
+		Short:           "Get company profile, executives, and operating data",
+		SelectorFlag:    "view",
+		SelectorDefault: "profile",
+		Variants: []quoteRESTVariant{
+			{Value: "profile", Cmd: "company-profile"},
+			{Value: "executives", Cmd: "company-executives"},
+			{Value: "background", Cmd: "company-executive-background"},
+			{Value: "efficiency", Cmd: "company-operational-efficiency"},
+		},
+	},
+	{
+		Cmd:             "corporate-actions",
+		Use:             "corporate-actions <symbol>",
+		Short:           "Get corporate-action records",
+		SelectorFlag:    "type",
+		SelectorDefault: "dividends",
+		Variants: []quoteRESTVariant{
+			{Value: "splits", Cmd: "corporate-actions-stock-splits"},
+			{Value: "buybacks", Cmd: "corporate-actions-buybacks"},
+			{Value: "dividends", Cmd: "corporate-actions-dividends"},
+			{Value: "rehab", Cmd: "corporate-actions-rehab"},
+		},
+	},
+	{
+		Cmd:             "economic-calendar",
+		Use:             "economic-calendar [keyword]",
+		Short:           "Get or search economic-calendar data",
+		SelectorFlag:    "view",
+		SelectorDefault: "hot",
+		Variants: []quoteRESTVariant{
+			{Value: "hot", Cmd: "economic-calendar-hot"},
+			{Value: "search", Cmd: "economic-calendar-search"},
+		},
+	},
+	{
+		Cmd:             "financials",
+		Use:             "financials <symbol>",
+		Short:           "Get financial statements, revenue, and earnings-price data",
+		SelectorFlag:    "view",
+		SelectorDefault: "statements",
+		Variants: []quoteRESTVariant{
+			{Value: "statements", Cmd: "financials-statements"},
+			{Value: "revenue", Cmd: "financials-revenue-breakdown"},
+			{Value: "earnings-history", Cmd: "financials-earnings-price-history"},
+			{Value: "earnings-move", Cmd: "financials-earnings-price-move"},
+		},
+	},
+	{
+		Cmd:             "ipo-list",
+		Use:             "ipo-list",
+		Short:           "Get IPO lists by market",
+		SelectorFlag:    "market",
+		SelectorDefault: "HK",
+		Variants: []quoteRESTVariant{
+			{Value: "HK", Cmd: "ipo-list-hk"},
+			{Value: "US", Cmd: "ipo-list-us"},
+			{Value: "SG", Cmd: "ipo-list-sg"},
+			{Value: "MY", Cmd: "ipo-list-my"},
+			{Value: "CN", Cmd: "ipo-list-cn"},
+		},
+	},
+	{
+		Cmd:             "option-data",
+		Use:             "option-data <symbol>",
+		Short:           "Get option analytics and strategy data",
+		SelectorFlag:    "view",
+		SelectorDefault: "expiration",
+		Variants: []quoteRESTVariant{
+			{Value: "expiration", Cmd: "option-expiration-date"},
+			{Value: "strategy", Cmd: "option-strategy"},
+			{Value: "spread", Cmd: "option-strategy-spread"},
+			{Value: "probability", Cmd: "option-exercise-probability"},
+			{Value: "volatility", Cmd: "option-volatility"},
+		},
+	},
+	{
+		Cmd:             "plate",
+		Use:             "plate [symbol]",
+		Short:           "Get plate lists, plate stocks, or a symbol's owner plates",
+		SelectorFlag:    "view",
+		SelectorDefault: "list",
+		Variants: []quoteRESTVariant{
+			{Value: "list", Cmd: "plate-list"},
+			{Value: "stocks", Cmd: "plate-stock"},
+			{Value: "owner", Cmd: "owner-plate"},
+		},
+	},
+	{
+		Cmd:             "research",
+		Use:             "research <symbol>",
+		Short:           "Get research ratings and reports",
+		SelectorFlag:    "type",
+		SelectorDefault: "consensus",
+		Variants: []quoteRESTVariant{
+			{Value: "morningstar", Cmd: "research-morningstar-report"},
+			{Value: "consensus", Cmd: "research-analyst-consensus"},
+			{Value: "rating", Cmd: "research-rating-summary"},
+		},
+	},
+	{
+		Cmd:             "search",
+		Use:             "search [keyword]",
+		Short:           "Search news, community content, or stock feeds",
+		SelectorFlag:    "type",
+		SelectorDefault: "news",
+		Variants: []quoteRESTVariant{
+			{Value: "news", Cmd: "news-search"},
+			{Value: "community", Cmd: "community-search"},
+			{Value: "feed", Cmd: "stock-feed"},
+		},
+	},
+	{
+		Cmd:             "shareholders",
+		Use:             "shareholders <symbol>",
+		Short:           "Get shareholders and insider ownership data",
+		SelectorFlag:    "view",
+		SelectorDefault: "overview",
+		Variants: []quoteRESTVariant{
+			{Value: "overview", Cmd: "shareholders-overview"},
+			{Value: "institutional", Cmd: "shareholders-institutional"},
+			{Value: "changes", Cmd: "shareholders-holding-changes"},
+			{Value: "holder-detail", Cmd: "shareholders-holder-detail"},
+			{Value: "insider-holders", Cmd: "insider-holder-list"},
+			{Value: "insider-trades", Cmd: "insider-trade-list"},
+		},
+	},
+	{
+		Cmd:             "short",
+		Use:             "short <symbol>",
+		Short:           "Get short-selling data",
+		SelectorFlag:    "type",
+		SelectorDefault: "volume",
+		Variants: []quoteRESTVariant{
+			{Value: "volume", Cmd: "daily-short-volume"},
+			{Value: "interest", Cmd: "short-interest"},
+		},
+	},
+	{
+		Cmd:             "watchlist",
+		Use:             "watchlist [symbol...]",
+		Short:           "Get or modify user watchlists",
+		SelectorFlag:    "action",
+		SelectorDefault: "list",
+		Variants: []quoteRESTVariant{
+			{Value: "groups", Cmd: "user-security-group"},
+			{Value: "list", Cmd: "user-security"},
+			{Value: "add", Cmd: "modify-user-security"},
+			{Value: "delete", Cmd: "modify-user-security"},
+			{Value: "move-out", Cmd: "modify-user-security"},
+		},
+	},
+	{
+		Cmd:             "valuation",
+		Use:             "valuation [symbol]",
+		Short:           "Get valuation metrics and valuation stock lists",
+		SelectorFlag:    "view",
+		SelectorDefault: "detail",
+		Variants: []quoteRESTVariant{
+			{Value: "detail", Cmd: "valuation-detail"},
+			{Value: "plate-stocks", Cmd: "valuation-plate-stock-list"},
+			{Value: "index-stocks", Cmd: "valuation-index-component-stock-list"},
+			{Value: "index-plates", Cmd: "valuation-index-stock-plate-list"},
+		},
+	},
+}
+
+func registerQuoteRESTAggregateCommands(specs []quoteRESTSpec) map[string]bool {
+	specByCmd := make(map[string]*quoteRESTSpec, len(specs))
+	for i := range specs {
+		specByCmd[specs[i].Cmd] = &specs[i]
 	}
-	return specs, nil
+
+	registered := map[string]bool{}
+	for _, aggregate := range quoteRESTAggregates {
+		cmd := newQuoteRESTAggregateCommand(aggregate, specByCmd)
+		if cmd == nil {
+			continue
+		}
+		rootCmd.AddCommand(cmd)
+		for _, variant := range aggregate.Variants {
+			registered[variant.Cmd] = true
+		}
+	}
+	return registered
+}
+
+func newQuoteRESTAggregateCommand(aggregate quoteRESTAggregate, specByCmd map[string]*quoteRESTSpec) *cobra.Command {
+	variantSpecs := make(map[string]*quoteRESTSpec, len(aggregate.Variants))
+	for _, variant := range aggregate.Variants {
+		spec := specByCmd[variant.Cmd]
+		if spec == nil {
+			continue
+		}
+		variantSpecs[variant.Value] = spec
+	}
+	if len(variantSpecs) == 0 {
+		return nil
+	}
+
+	cmd := &cobra.Command{
+		Use:     aggregate.Use,
+		GroupID: quoteGroupID,
+		Short:   aggregate.Short,
+		Example: quoteRESTAggregateExample(aggregate),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			spec, err := selectedQuoteRESTSpec(cmd, aggregate, variantSpecs)
+			if err != nil {
+				return err
+			}
+			if err := applyQuoteRESTAggregateDefaults(cmd, aggregate); err != nil {
+				return err
+			}
+			return runQuoteREST(cmd, args, spec)
+		},
+	}
+	cmd.Flags().String(aggregate.SelectorFlag, aggregate.SelectorDefault, quoteRESTAggregateSelectorUsage(aggregate))
+	addQuoteRESTAggregateFlags(cmd, aggregate, variantSpecs)
+	return cmd
+}
+
+func selectedQuoteRESTSpec(cmd *cobra.Command, aggregate quoteRESTAggregate, variants map[string]*quoteRESTSpec) (*quoteRESTSpec, error) {
+	value, err := cmd.Flags().GetString(aggregate.SelectorFlag)
+	if err != nil {
+		return nil, err
+	}
+	value = normalizeQuoteRESTSelectorValue(value)
+	for variant, spec := range variants {
+		if normalizeQuoteRESTSelectorValue(variant) == value {
+			return spec, nil
+		}
+	}
+	return nil, fmt.Errorf("invalid --%s %q; valid values: %s", aggregate.SelectorFlag, value, quoteRESTAggregateSelectorValues(aggregate))
+}
+
+func applyQuoteRESTAggregateDefaults(cmd *cobra.Command, aggregate quoteRESTAggregate) error {
+	if aggregate.Cmd != "watchlist" {
+		return nil
+	}
+	action, err := cmd.Flags().GetString(aggregate.SelectorFlag)
+	if err != nil {
+		return err
+	}
+	switch normalizeQuoteRESTSelectorValue(action) {
+	case "add":
+		return setUnchangedFlag(cmd, "op", "ADD")
+	case "delete":
+		return setUnchangedFlag(cmd, "op", "DEL")
+	case "move-out":
+		return setUnchangedFlag(cmd, "op", "MOVE_OUT")
+	default:
+		return nil
+	}
+}
+
+func setUnchangedFlag(cmd *cobra.Command, name string, value string) error {
+	if cmd.Flags().Changed(name) {
+		return nil
+	}
+	return cmd.Flags().Set(name, value)
+}
+
+func normalizeQuoteRESTSelectorValue(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func quoteRESTAggregateSelectorUsage(aggregate quoteRESTAggregate) string {
+	return fmt.Sprintf("Select endpoint variant (default: %s). Values: %s", aggregate.SelectorDefault, quoteRESTAggregateSelectorValues(aggregate))
+}
+
+func quoteRESTAggregateSelectorValues(aggregate quoteRESTAggregate) string {
+	values := make([]string, 0, len(aggregate.Variants))
+	for _, variant := range aggregate.Variants {
+		values = append(values, variant.Value)
+	}
+	return strings.Join(values, "/")
+}
+
+func quoteRESTAggregateExample(aggregate quoteRESTAggregate) string {
+	switch aggregate.Cmd {
+	case "ipo-list":
+		return "  futu ipo-list\n  futu ipo-list --market US --format json"
+	case "economic-calendar":
+		return "  futu economic-calendar\n  futu economic-calendar CPI --view search"
+	case "watchlist":
+		return "  futu watchlist\n  futu watchlist HK.00700 --action add --group-name All"
+	case "search":
+		return "  futu search US.AAPL\n  futu search AAPL --type community"
+	case "plate":
+		return "  futu plate\n  futu plate HK.LIST1045 --view stocks"
+	default:
+		return fmt.Sprintf("  futu %s HK.00700\n  futu %s HK.00700 --%s %s --format json",
+			aggregate.Cmd, aggregate.Cmd, aggregate.SelectorFlag, aggregate.Variants[len(aggregate.Variants)-1].Value)
+	}
+}
+
+func addQuoteRESTAggregateFlags(cmd *cobra.Command, aggregate quoteRESTAggregate, variantSpecs map[string]*quoteRESTSpec) {
+	params := map[string]quoteRESTParam{}
+	kinds := map[string]map[string]bool{}
+	for _, variant := range aggregate.Variants {
+		spec := variantSpecs[variant.Value]
+		if spec == nil {
+			continue
+		}
+		for _, p := range spec.Params {
+			if skipQuoteRESTFlag(spec, p) {
+				continue
+			}
+			name := flagName(p.Name)
+			if cmd.Flags().Lookup(name) != nil {
+				continue
+			}
+			params[name] = p
+			if kinds[name] == nil {
+				kinds[name] = map[string]bool{}
+			}
+			kinds[name][p.Kind] = true
+		}
+		if spec.Extra == "leader_name" && cmd.Flags().Lookup("leader") == nil {
+			cmd.Flags().String("leader", "", "Executive name (default: first executive returned by the company executives endpoint)")
+		}
+	}
+
+	names := make([]string, 0, len(params))
+	for name := range params {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		p := params[name]
+		kind := p.Kind
+		if len(kinds[name]) > 1 {
+			kind = "string"
+		}
+		addQuoteRESTFlag(cmd, p, kind)
+	}
+}
+
+func addQuoteRESTFlag(cmd *cobra.Command, p quoteRESTParam, kind string) {
+	name := flagName(p.Name)
+	usage := quoteRESTUsage(p)
+	switch kind {
+	case "int":
+		cmd.Flags().Int(name, 0, usage)
+	case "bool":
+		cmd.Flags().Bool(name, false, usage)
+	case "float":
+		cmd.Flags().Float64(name, 0, usage)
+	case "strings":
+		cmd.Flags().StringSlice(name, nil, usage)
+	default:
+		cmd.Flags().String(name, "", usage)
+	}
 }
 
 func newQuoteRESTCommand(spec *quoteRESTSpec) *cobra.Command {
@@ -89,19 +468,7 @@ func newQuoteRESTCommand(spec *quoteRESTSpec) *cobra.Command {
 		if skipQuoteRESTFlag(spec, p) {
 			continue
 		}
-		usage := quoteRESTUsage(p)
-		switch p.Kind {
-		case "int":
-			cmd.Flags().Int(flagName(p.Name), atoiDefault(p.Default), usage)
-		case "bool":
-			cmd.Flags().Bool(flagName(p.Name), p.Default == "true", usage)
-		case "float":
-			cmd.Flags().Float64(flagName(p.Name), atofDefault(p.Default), usage)
-		case "strings":
-			cmd.Flags().StringSlice(flagName(p.Name), nil, usage)
-		default:
-			cmd.Flags().String(flagName(p.Name), resolveStaticDefault(p.Default), usage)
-		}
+		addQuoteRESTFlag(cmd, p, p.Kind)
 	}
 	if spec.Extra == "leader_name" {
 		cmd.Flags().String("leader", "", "Executive name (default: first executive returned by the company executives endpoint)")
@@ -150,7 +517,7 @@ func quoteRESTUse(spec *quoteRESTSpec) string {
 	case "keyword":
 		return spec.Cmd + " [keyword]"
 	case "plate":
-		return spec.Cmd + " [plate]"
+		return spec.Cmd + " [symbol]"
 	default:
 		return spec.Cmd
 	}
@@ -163,6 +530,9 @@ func quoteRESTExample(spec *quoteRESTSpec) string {
 	case "codes":
 		return fmt.Sprintf("  futu %s HK.00700\n  futu %s HK.00700 US.AAPL", spec.Cmd, spec.Cmd)
 	case "keyword":
+		if spec.Extra == "symbol" {
+			return fmt.Sprintf("  futu %s\n  futu %s US.AAPL", spec.Cmd, spec.Cmd)
+		}
 		return fmt.Sprintf("  futu %s\n  futu %s FUTU", spec.Cmd, spec.Cmd)
 	case "plate":
 		return fmt.Sprintf("  futu %s\n  futu %s HK.LIST1045", spec.Cmd, spec.Cmd)
@@ -172,7 +542,10 @@ func quoteRESTExample(spec *quoteRESTSpec) string {
 }
 
 func quoteRESTUsage(p quoteRESTParam) string {
-	parts := []string{p.Name}
+	parts := []string{quoteRESTUsageName(p.Name)}
+	if isQuoteRESTSymbolParam(p.Name) {
+		parts = append(parts, "in MARKET.CODE format")
+	}
 	if p.Default != "" {
 		parts = append(parts, fmt.Sprintf("(default: %s)", p.Default))
 	} else if !p.Required {
@@ -254,7 +627,7 @@ func runQuoteREST(cmd *cobra.Command, args []string, spec *quoteRESTSpec) error 
 		body["code_list"] = codes
 		hasBody = true
 	case "keyword":
-		keyword := "00700"
+		keyword := "HK.00700"
 		field := spec.Extra
 		if field == "" {
 			field = "symbol"
@@ -278,6 +651,13 @@ func runQuoteREST(cmd *cobra.Command, args []string, spec *quoteRESTSpec) error 
 			keyword = args[0]
 		}
 		if keyword != "" {
+			if isQuoteRESTSymbolParam(field) {
+				code, err := parseOneFutuCode(keyword)
+				if err != nil {
+					return err
+				}
+				keyword = code
+			}
 			putRESTValue(query, body, hasBody, quoteRESTParam{Name: field, Kind: "string", Source: "query", Required: true}, keyword)
 		}
 	case "plate":
@@ -293,11 +673,11 @@ func runQuoteREST(cmd *cobra.Command, args []string, spec *quoteRESTSpec) error 
 			}
 		}
 		if fv, err := cmd.Flags().GetString(flagName(field)); err == nil && fv != "" {
-			if parsed, err := parseOneFutuCode(fv); err == nil {
-				plate = parsed
-			} else {
-				plate = fv
+			code, err := parseOneFutuCode(fv)
+			if err != nil {
+				return err
 			}
+			plate = code
 		}
 		if len(args) > 0 {
 			code, err := parseOneFutuCode(args[0])
@@ -384,7 +764,7 @@ func runQuoteREST(cmd *cobra.Command, args []string, spec *quoteRESTSpec) error 
 }
 
 func applyWarrantPageDefault(cmd *cobra.Command, body map[string]any) {
-	if cmd.Flags().Changed("stock-owner") || cmd.Flags().Changed("screen-groups") {
+	if cmd.Flags().Changed(flagName("stock_owner")) || cmd.Flags().Changed("screen-groups") {
 		return
 	}
 	marketType, _ := cmd.Flags().GetInt("market-type")
@@ -400,6 +780,15 @@ func parseOneFutuCode(raw string) (string, error) {
 		return "", fmt.Errorf("parsing symbol: %w", err)
 	}
 	return sym.FutuCode(), nil
+}
+
+func isQuoteRESTSymbolParam(name string) bool {
+	switch name {
+	case "symbol", "code_list", "stock_owner", "filter_security":
+		return true
+	default:
+		return false
+	}
 }
 
 func firstSimAccountID(cmd *cobra.Command) (string, error) {
@@ -462,38 +851,96 @@ func firstExecutiveName(cmd *cobra.Command, code string) (string, error) {
 
 func readRESTFlag(cmd *cobra.Command, p quoteRESTParam) (any, bool, error) {
 	name := flagName(p.Name)
-	if !cmd.Flags().Changed(name) && p.Default == "" && !p.Required {
-		return nil, false, nil
+	changed := cmd.Flags().Changed(name)
+	if !changed {
+		if p.Default != "" {
+			value, err := parseRESTFlagDefault(name, p)
+			return value, true, err
+		}
+		if !p.Required {
+			return nil, false, nil
+		}
 	}
 	switch p.Kind {
 	case "int":
+		if isRESTStringFlag(cmd, name) {
+			raw, err := cmd.Flags().GetString(name)
+			if err != nil {
+				return nil, false, err
+			}
+			value, err := strconv.Atoi(raw)
+			if err != nil {
+				return nil, false, fmt.Errorf("--%s requires integer: %w", name, err)
+			}
+			return value, true, nil
+		}
 		v, err := cmd.Flags().GetInt(name)
 		if err != nil {
 			return nil, false, err
 		}
-		if !cmd.Flags().Changed(name) && p.Default == "" && v == 0 && !p.Required {
+		if !changed && p.Default == "" && v == 0 && !p.Required {
 			return nil, false, nil
 		}
 		return v, true, nil
 	case "bool":
+		if isRESTStringFlag(cmd, name) {
+			raw, err := cmd.Flags().GetString(name)
+			if err != nil {
+				return nil, false, err
+			}
+			value, err := strconv.ParseBool(raw)
+			if err != nil {
+				return nil, false, fmt.Errorf("--%s requires boolean: %w", name, err)
+			}
+			return value, true, nil
+		}
 		v, err := cmd.Flags().GetBool(name)
 		if err != nil {
 			return nil, false, err
 		}
-		if !cmd.Flags().Changed(name) && p.Default == "" && !v && !p.Required {
+		if !changed && p.Default == "" && !v && !p.Required {
 			return nil, false, nil
 		}
 		return v, true, nil
 	case "float":
+		if isRESTStringFlag(cmd, name) {
+			raw, err := cmd.Flags().GetString(name)
+			if err != nil {
+				return nil, false, err
+			}
+			value, err := strconv.ParseFloat(raw, 64)
+			if err != nil {
+				return nil, false, fmt.Errorf("--%s requires number: %w", name, err)
+			}
+			return value, true, nil
+		}
 		v, err := cmd.Flags().GetFloat64(name)
 		if err != nil {
 			return nil, false, err
 		}
-		if !cmd.Flags().Changed(name) && p.Default == "" && v == 0 && !p.Required {
+		if !changed && p.Default == "" && v == 0 && !p.Required {
 			return nil, false, nil
 		}
 		return v, true, nil
 	case "strings":
+		if isRESTStringFlag(cmd, name) {
+			raw, err := cmd.Flags().GetString(name)
+			if err != nil {
+				return nil, false, err
+			}
+			v := strings.Split(raw, ",")
+			if len(v) == 0 {
+				return nil, false, nil
+			}
+			if p.Name == "code_list" {
+				codes, err := parseFutuCodes(v)
+				if err != nil {
+					return nil, false, err
+				}
+				return codes, true, nil
+			}
+			return v, true, nil
+		}
 		v, err := cmd.Flags().GetStringSlice(name)
 		if err != nil {
 			return nil, false, err
@@ -501,25 +948,88 @@ func readRESTFlag(cmd *cobra.Command, p quoteRESTParam) (any, bool, error) {
 		if len(v) == 0 {
 			return nil, false, nil
 		}
+		if p.Name == "code_list" {
+			codes, err := parseFutuCodes(v)
+			if err != nil {
+				return nil, false, err
+			}
+			return codes, true, nil
+		}
 		return v, true, nil
 	default:
 		v, err := cmd.Flags().GetString(name)
 		if err != nil {
 			return nil, false, err
 		}
-		v = resolveDateToken(v)
-		if v == "" {
-			return nil, false, nil
-		}
-		if p.Kind == "json" {
-			var parsed any
-			if err := json.Unmarshal([]byte(v), &parsed); err != nil {
-				return nil, false, fmt.Errorf("--%s requires JSON: %w", name, err)
-			}
-			return parsed, true, nil
-		}
-		return v, true, nil
+		return parseRESTFlagString(name, p, v)
 	}
+}
+
+func parseRESTFlagDefault(name string, p quoteRESTParam) (any, error) {
+	raw := resolveStaticDefault(p.Default)
+	switch p.Kind {
+	case "int":
+		value, err := strconv.Atoi(raw)
+		if err != nil {
+			return nil, fmt.Errorf("--%s default requires integer: %w", name, err)
+		}
+		return value, nil
+	case "bool":
+		value, err := strconv.ParseBool(raw)
+		if err != nil {
+			return nil, fmt.Errorf("--%s default requires boolean: %w", name, err)
+		}
+		return value, nil
+	case "float":
+		value, err := strconv.ParseFloat(raw, 64)
+		if err != nil {
+			return nil, fmt.Errorf("--%s default requires number: %w", name, err)
+		}
+		return value, nil
+	case "strings":
+		if raw == "" {
+			return []string{}, nil
+		}
+		values := strings.Split(raw, ",")
+		if p.Name == "code_list" {
+			codes, err := parseFutuCodes(values)
+			if err != nil {
+				return nil, err
+			}
+			return codes, nil
+		}
+		return values, nil
+	default:
+		value, _, err := parseRESTFlagString(name, p, raw)
+		return value, err
+	}
+}
+
+func isRESTStringFlag(cmd *cobra.Command, name string) bool {
+	flag := cmd.Flags().Lookup(name)
+	return flag != nil && flag.Value.Type() == "string"
+}
+
+func parseRESTFlagString(name string, p quoteRESTParam, value string) (any, bool, error) {
+	value = resolveDateToken(value)
+	if value == "" {
+		return nil, false, nil
+	}
+	if p.Kind == "json" {
+		var parsed any
+		if err := json.Unmarshal([]byte(value), &parsed); err != nil {
+			return nil, false, fmt.Errorf("--%s requires JSON: %w", name, err)
+		}
+		return parsed, true, nil
+	}
+	if isQuoteRESTSymbolParam(p.Name) {
+		code, err := parseOneFutuCode(value)
+		if err != nil {
+			return nil, false, err
+		}
+		return code, true, nil
+	}
+	return value, true, nil
 }
 
 func putRESTValue(query url.Values, body map[string]any, hasBody bool, p quoteRESTParam, value any) {
@@ -558,7 +1068,25 @@ func putRESTValue(query url.Values, body map[string]any, hasBody bool, p quoteRE
 }
 
 func flagName(name string) string {
-	return strings.ReplaceAll(name, "_", "-")
+	switch name {
+	case "stock_owner":
+		return "symbol"
+	case "filter_security":
+		return "filter-symbol"
+	default:
+		return strings.ReplaceAll(name, "_", "-")
+	}
+}
+
+func quoteRESTUsageName(name string) string {
+	switch name {
+	case "stock_owner":
+		return "symbol"
+	case "filter_security":
+		return "filter-symbol"
+	default:
+		return name
+	}
 }
 
 func atoiDefault(raw string) int {

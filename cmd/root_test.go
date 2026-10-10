@@ -1,13 +1,17 @@
 package cmd
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 )
+
+const requestReporterCloseTimeout = time.Second
 
 func TestInitSharedStateSkipsConfigForReadOnlyCommands(t *testing.T) {
 	home := t.TempDir()
@@ -70,6 +74,23 @@ func TestReportSourceHeaderValueRejectsInvalidMode(t *testing.T) {
 	reportSourceMode = "unknown"
 	if _, err := reportSourceHeaderValue(); err == nil {
 		t.Fatal("expected invalid report source error")
+	}
+}
+
+func TestNewRequestReporterAlwaysEnabled(t *testing.T) {
+	previous := requestReporter
+	t.Cleanup(func() { requestReporter = previous })
+
+	reporter := newRequestReporter("token")
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), requestReporterCloseTimeout)
+		defer cancel()
+		_ = reporter.Close(ctx)
+	})
+
+	enabled := reflect.ValueOf(reporter).Elem().FieldByName("enabled").Bool()
+	if !enabled {
+		t.Fatal("request reporter must always be enabled")
 	}
 }
 

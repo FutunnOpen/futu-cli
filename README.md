@@ -53,7 +53,7 @@ futu check
 Run a quote query:
 
 ```bash
-futu quote AAPL.US
+futu quote US.AAPL
 ```
 
 ## Update
@@ -102,7 +102,7 @@ auto_update
 
 ## Commands
 
-Most commands support `--format json` for JSON output and `--format table` (default) for tabular output. Commands that interact with an account accept `--account <account-id>`; use `futu account list` to find the ID. Securities trading commands default to market `HK`; use `--market` (or `-m`) to switch.
+Most commands support `--format json` for JSON output and `--format table` (default) for tabular output. Commands that interact with an account accept `--account <account-id>`; use `futu account list` to find the ID. Securities quote/trading symbols use `MARKET.CODE`, for example `US.AAPL` or `HK.00700`; crypto symbols keep their pair format, for example `BTCUSD`.
 
 ### Authentication
 
@@ -123,18 +123,18 @@ Most commands support `--format json` for JSON output and `--format table` (defa
 |---------|-------------|
 | `futu account list` | List authorized trading accounts; the Account ID is used as `--account` |
 | `futu account funds` | Query account funds (total assets, cash, market value, buying power, P/L, risk status) |
-| `futu position` | List positions; filter by `--symbol` or P/L ratio |
+| `futu position` | List positions; filter by `--symbol US.AAPL` or P/L ratio |
 | `futu order buy <symbol> <qty>` | Place a buy order (market/limit/stop/limit_if_touched); confirms before submission |
 | `futu order sell <symbol> <qty>` | Place a sell order; same parameters as `order buy` |
 | `futu order place <qty>` | Submit a generic securities order (SELL_SHORT, BUY_BACK, conditional, multi-leg) |
 | `futu order modify <order-id>` | Modify order qty/price/trigger; requires `--exchange`; confirms before submission |
 | `futu order cancel <order-id>` | Cancel an order; requires `--exchange`; confirms before submission |
 | `futu order list` | List open orders; supports `--market` and `--page-size` |
-| `futu order history` | List historical orders; supports `--market`, `--symbol`, `--start`/`--end` (microseconds) |
+| `futu order history` | List historical orders; supports `--market`, `--symbol US.AAPL`, `--start`/`--end` (microseconds) |
 | `futu order detail <order-id> [order-id...]` | Batch query order details; up to 100 IDs; requires `--exchange` |
 | `futu order max-qty <symbol>` | Query max buy/sell/sell-short/buy-back quantities and margin requirements |
 | `futu deal` | List today's filled trades |
-| `futu deal history` | List historical filled trades; supports `--market`, `--symbol`, `--start`/`--end` (microseconds) |
+| `futu deal history` | List historical filled trades; supports `--market`, `--symbol US.AAPL`, `--start`/`--end` (microseconds) |
 
 ### Crypto
 

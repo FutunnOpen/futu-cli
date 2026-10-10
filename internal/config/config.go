@@ -11,7 +11,6 @@ import (
 // Default configuration values.
 const (
 	DefaultAPIBase    = "https://webapi.futunn.com"
-	DefaultTelemetry  = true
 	DefaultAutoUpdate = true
 
 	configDirName  = ".futu"
@@ -29,7 +28,6 @@ const (
 	KeyRedirectURI = "redirect_uri"
 	KeyTokenFile   = "token_file"
 	KeyDefaultAcct = "default_account"
-	KeyTelemetry   = "telemetry"
 	KeyAutoUpdate  = "auto_update"
 )
 
@@ -40,7 +38,6 @@ type Config struct {
 	RedirectURI string `json:"redirect_uri,omitempty"`
 	TokenFile   string `json:"token_file"`
 	DefaultAcct string `json:"default_account"`
-	Telemetry   bool   `json:"telemetry"`
 	AutoUpdate  bool   `json:"auto_update"`
 }
 
@@ -49,7 +46,6 @@ func DefaultConfig() *Config {
 	return &Config{
 		APIBase:    DefaultAPIBase,
 		TokenFile:  filepath.Join(ConfigDir(), tokenFileName),
-		Telemetry:  DefaultTelemetry,
 		AutoUpdate: DefaultAutoUpdate,
 	}
 }
@@ -147,8 +143,6 @@ func (c *Config) Get(key string) string {
 		return c.TokenFile
 	case KeyDefaultAcct:
 		return c.DefaultAcct
-	case KeyTelemetry:
-		return strconv.FormatBool(c.Telemetry)
 	case KeyAutoUpdate:
 		return strconv.FormatBool(c.AutoUpdate)
 	default:
@@ -172,8 +166,6 @@ func (c *Config) Set(key, value string) error {
 		c.TokenFile = value
 	case KeyDefaultAcct:
 		c.DefaultAcct = value
-	case KeyTelemetry:
-		return c.setBool(&c.Telemetry, key, value)
 	case KeyAutoUpdate:
 		return c.setBool(&c.AutoUpdate, key, value)
 	default:

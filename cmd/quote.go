@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -30,12 +31,8 @@ var quoteCmd = &cobra.Command{
 	Short:   "Get real-time quotes",
 	Long: `Get real-time quotes for one or more symbols. For US stocks, pre-market, post-market, or overnight sessions are printed as additional rows when available.
 
-Supported symbol formats:
-  HK.00700     market.code
-  700.HK       code.market
-  700          numeric symbols default to HK
-  US.AAPL      market.code
-  AAPL         alphabetic symbols default to US`,
+Symbol format:
+  MARKET.CODE, for example US.AAPL or HK.00700`,
 	Example: `  futu quote HK.00700
   futu quote US.AAPL
   futu quote US.AAPL --format json`,
@@ -77,6 +74,18 @@ func parseFutuCodes(args []string) ([]string, error) {
 		codes = append(codes, s.FutuCode())
 	}
 	return codes, nil
+}
+
+func parseOptionalFutuCode(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", nil
+	}
+	code, err := parseOneFutuCode(raw)
+	if err != nil {
+		return "", err
+	}
+	return code, nil
 }
 
 func renderQuoteTable(quotes []service.StockQuote) {

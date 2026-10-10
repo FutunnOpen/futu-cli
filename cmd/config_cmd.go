@@ -16,7 +16,6 @@ var allConfigKeys = []string{
 	config.KeyRedirectURI,
 	config.KeyTokenFile,
 	config.KeyDefaultAcct,
-	config.KeyTelemetry,
 	config.KeyAutoUpdate,
 }
 

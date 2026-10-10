@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -57,7 +56,7 @@ func registerDealHistoryFlags(cmd *cobra.Command) {
 	registerDealFlags(cmd)
 	cmd.Flags().Int64("start", 0, "Start time as a microsecond timestamp (default: no lower bound)")
 	cmd.Flags().Int64("end", 0, "End time as a microsecond timestamp (default: no upper bound)")
-	cmd.Flags().String("symbol", "", "Symbol filter (default: no filter)")
+	cmd.Flags().String("symbol", "", "Symbol filter in MARKET.CODE format, for example US.AAPL")
 }
 
 // runDeal is the top-level handler for the deal command.
@@ -123,12 +122,16 @@ func buildHistoryDealsRequest(cmd *cobra.Command) (service.HistoryDealsRequest, 
 	if err != nil {
 		return service.HistoryDealsRequest{}, fmt.Errorf("reading symbol flag: %w", err)
 	}
+	symbol, err = parseOptionalFutuCode(symbol)
+	if err != nil {
+		return service.HistoryDealsRequest{}, err
+	}
 	return service.HistoryDealsRequest{
 		Account:  account,
 		Market:   market,
 		Start:    start,
 		End:      end,
-		Symbol:   strings.TrimSpace(symbol),
+		Symbol:   symbol,
 		PageSize: pageSize,
 	}, nil
 }

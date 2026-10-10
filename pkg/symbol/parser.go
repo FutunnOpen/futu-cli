@@ -49,35 +49,31 @@ var knownMarkets = map[string]bool{
 // HK stock code width for zero-padding.
 const hkCodeWidth = 5
 
+const marketCodeSeparator = "."
+
 // Symbol represents a parsed financial instrument identifier.
 type Symbol struct {
 	Code   string // e.g. "00700"
 	Market string // e.g. "HK"
-	Full   string // e.g. "00700.HK"
+	Full   string // e.g. "HK.00700"
 }
 
 // Parse parses a symbol input string into a Symbol struct.
 //
 // Supported formats:
-//   - "700.HK" -> pads to "00700.HK"
-//   - "AAPL" -> defaults to "AAPL.US"
-//   - "AAPL.US" -> as-is
-//   - "BTC-USD" -> "BTC-USD.CRYPTO"
+//   - "HK.00700" -> "HK.00700"
+//   - "HK.700" -> pads to "HK.00700"
+//   - "US.AAPL" -> "US.AAPL"
 func Parse(input string) (*Symbol, error) {
 	input = strings.TrimSpace(input)
 	if len(input) == 0 {
 		return nil, fmt.Errorf("empty symbol input")
 	}
 
-	if isCryptoSymbol(input) {
-		return buildCrypto(input), nil
+	market, code, err := splitMarketCode(input)
+	if err != nil {
+		return nil, err
 	}
-
-	code, market := splitSymbol(input)
-	if len(market) == 0 {
-		market = inferMarket(code)
-	}
-	market = strings.ToUpper(market)
 	code = normalizeCode(code, market)
 
 	return buildSymbol(code, market), nil
@@ -100,38 +96,16 @@ func ParseMulti(inputs []string) ([]*Symbol, error) {
 	return symbols, nil
 }
 
-// isCryptoSymbol checks if the input looks like a crypto pair (contains "-"
-// but no ".").
-func isCryptoSymbol(input string) bool {
-	return strings.Contains(input, "-") && !strings.Contains(input, ".")
-}
-
-// buildCrypto builds a Symbol for a crypto pair.
-func buildCrypto(input string) *Symbol {
-	code := strings.ToUpper(input)
-	return buildSymbol(code, MarketCrypto)
-}
-
-func splitSymbol(input string) (string, string) {
-	idx := strings.Index(input, ".")
-	if idx < 0 {
-		return input, ""
+func splitMarketCode(input string) (string, string, error) {
+	market, code, ok := strings.Cut(input, marketCodeSeparator)
+	if !ok || market == "" || code == "" {
+		return "", "", fmt.Errorf("invalid symbol %q: expected MARKET.CODE, for example US.AAPL or HK.00700", input)
 	}
-	left, right := input[:idx], input[idx+1:]
-	if knownMarkets[strings.ToUpper(left)] {
-		return right, left
+	market = strings.ToUpper(market)
+	if !knownMarkets[market] {
+		return "", "", fmt.Errorf("invalid symbol %q: unknown market %q; expected MARKET.CODE, for example US.AAPL", input, market)
 	}
-	last := strings.LastIndex(input, ".")
-	return input[:last], input[last+1:]
-}
-
-// inferMarket determines the default market based on the code format.
-// Pure digits default to HK; anything else defaults to US.
-func inferMarket(code string) string {
-	if isAllDigits(code) {
-		return MarketHK
-	}
-	return MarketUS
+	return market, code, nil
 }
 
 // isAllDigits returns true if s consists entirely of ASCII digits.
@@ -182,7 +156,7 @@ func buildSymbol(code, market string) *Symbol {
 	return &Symbol{
 		Code:   code,
 		Market: market,
-		Full:   code + "." + market,
+		Full:   market + "." + code,
 	}
 }
 

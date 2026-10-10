@@ -85,8 +85,8 @@ func TestSetHeaders_CliCmdFromContext(t *testing.T) {
 	}
 }
 
-func TestTradeMutationEndpointMatrixRequiresReportSource(t *testing.T) {
-	mutatingEndpoints := []string{
+func TestEndpointMatrixRequiresReportSource(t *testing.T) {
+	reportSourceEndpoints := []string{
 		"trade.order.place",
 		"trade.order.modify",
 		"trade.order.cancel",
@@ -94,20 +94,22 @@ func TestTradeMutationEndpointMatrixRequiresReportSource(t *testing.T) {
 		"crypto.order.place",
 		"crypto.order.modify",
 		"crypto.order.cancel",
+		"quote.stock_quote",
+		"quote.cur_kline",
+		"quote.owner_plate",
 	}
-	for _, endpoint := range mutatingEndpoints {
-		if !Endpoints[endpoint].ReportSource {
+	for _, endpoint := range reportSourceEndpoints {
+		if !requiresReportSource(endpoint, Endpoints[endpoint]) {
 			t.Fatalf("%s must require report source header", endpoint)
 		}
 	}
 
 	readOnlyEndpoints := []string{
-		"quote.snapshot",
 		"trade.order.open",
 		"crypto.order.active",
 	}
 	for _, endpoint := range readOnlyEndpoints {
-		if Endpoints[endpoint].ReportSource {
+		if requiresReportSource(endpoint, Endpoints[endpoint]) {
 			t.Fatalf("%s must not require report source header", endpoint)
 		}
 	}
@@ -147,6 +149,25 @@ func TestCallAddsReportSourceForTradeMutations(t *testing.T) {
 	c := New(srv.URL, WithReportSource("source-1"))
 	err := c.Call(context.Background(), "trade.order.place", CallOpts{
 		PathParams: map[string]string{"acc_id": "123"},
+	}, nil)
+	if err != nil {
+		t.Fatalf("Call() error = %v", err)
+	}
+}
+
+func TestCallAddsReportSourceForQuoteEndpoints(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get(headerReportSource); got != "source-1" {
+			t.Fatalf("%s = %q, want source-1", headerReportSource, got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	c := New(srv.URL, WithReportSource("source-1"))
+	err := c.Call(context.Background(), "quote.cur_kline", CallOpts{
+		PathParams: map[string]string{"symbol": "HK.00700"},
 	}, nil)
 	if err != nil {
 		t.Fatalf("Call() error = %v", err)

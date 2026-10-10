@@ -41,7 +41,7 @@ var positionCmd = &cobra.Command{
 
 func init() {
 	positionCmd.Flags().StringP("account", "a", "", "Trading account ID")
-	positionCmd.Flags().String("symbol", "", "Filter by symbol, for example US.AAPL")
+	positionCmd.Flags().String("symbol", "", "Symbol filter in MARKET.CODE format, for example US.AAPL")
 	positionCmd.Flags().String("pl-ratio-min", "", "Minimum P/L ratio, for example -0.1 means >= -10%")
 	positionCmd.Flags().String("pl-ratio-max", "", "Maximum P/L ratio, for example 0.2 means <= +20%")
 	rootCmd.AddCommand(positionCmd)
@@ -56,6 +56,10 @@ func runPosition(cmd *cobra.Command, _ []string) error {
 	symbol, err := cmd.Flags().GetString("symbol")
 	if err != nil {
 		return fmt.Errorf("reading symbol flag: %w", err)
+	}
+	symbol, err = parseOptionalFutuCode(symbol)
+	if err != nil {
+		return err
 	}
 	plRatioMin, err := cmd.Flags().GetString("pl-ratio-min")
 	if err != nil {

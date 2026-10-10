@@ -247,7 +247,7 @@ func registerSellFlags(cmd *cobra.Command) {
 
 func registerGenericPlaceFlags(cmd *cobra.Command) {
 	registerPlaceFlags(cmd)
-	cmd.Flags().StringVar(&orderFlags.symbol, "symbol", "", "Symbol (default: empty; required for non-multi-leg orders)")
+	cmd.Flags().StringVar(&orderFlags.symbol, "symbol", "", "Symbol in MARKET.CODE format, for example US.AAPL (required for non-multi-leg orders)")
 	cmd.Flags().StringVar(&orderFlags.side, "side", "", "Order side: BUY, SELL, SELL_SHORT, BUY_BACK (required; default: empty)")
 	_ = cmd.MarkFlagRequired("side")
 }
@@ -278,7 +278,7 @@ func registerHistoryOrderFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&orderFlags.market, "market", "m", service.DefaultTradingMarket, "Trading market: HK, US, HKCC, SG, JP, AU, MY, KR (default: HK)")
 	cmd.Flags().Int64Var(&orderFlags.start, "start", 0, "Start time as a microsecond timestamp (default: no lower bound)")
 	cmd.Flags().Int64Var(&orderFlags.end, "end", 0, "End time as a microsecond timestamp (default: no upper bound)")
-	cmd.Flags().StringVar(&orderFlags.symbol, "symbol", "", "Symbol filter (default: no filter)")
+	cmd.Flags().StringVar(&orderFlags.symbol, "symbol", "", "Symbol filter in MARKET.CODE format, for example US.AAPL")
 	cmd.Flags().IntVar(&orderFlags.pageSize, "page-size", service.DefaultPageSize, "Page size, range 10-100 (default: 50)")
 }
 
@@ -744,12 +744,16 @@ func buildHistoryOrdersRequest() (service.HistoryOrdersRequest, error) {
 	if len(account) == 0 {
 		return service.HistoryOrdersRequest{}, fmt.Errorf("account ID is required; use --account or configure default_account")
 	}
+	code, err := parseOptionalFutuCode(orderFlags.symbol)
+	if err != nil {
+		return service.HistoryOrdersRequest{}, err
+	}
 	return service.HistoryOrdersRequest{
 		Account:  account,
 		Market:   strings.TrimSpace(orderFlags.market),
 		Start:    orderFlags.start,
 		End:      orderFlags.end,
-		Symbol:   strings.TrimSpace(orderFlags.symbol),
+		Symbol:   code,
 		PageSize: orderFlags.pageSize,
 	}, nil
 }

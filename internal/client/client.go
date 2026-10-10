@@ -168,11 +168,15 @@ func (c *Client) Call(ctx context.Context, endpoint string, opts CallOpts, resul
 		return fmt.Errorf("unknown endpoint: %s", endpoint)
 	}
 	path := resolvePathParams(ep.Path, opts.PathParams)
-	if ep.ReportSource {
+	if requiresReportSource(endpoint, ep) {
 		ctx = context.WithValue(ctx, ctxKeyReportSourceRequired, true)
 	}
 	ctx = context.WithValue(ctx, ctxKeyPathTemplate, ep.Path)
 	return c.Do(ctx, ep.Method, path, opts.Params, opts.Body, result)
+}
+
+func requiresReportSource(endpoint string, ep Endpoint) bool {
+	return ep.ReportSource || strings.HasPrefix(endpoint, "quote.")
 }
 
 // resolvePathParams replaces {key} placeholders in a path template with

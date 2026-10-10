@@ -168,7 +168,7 @@ func initSharedState(cmd *cobra.Command) error {
 
 	reporter = analytics.NewReporter(
 		cfg.APIBase+analyticsEndpoint,
-		cfg.Telemetry,
+		true,
 	)
 	if cfg.AutoUpdate {
 		update.RefreshCacheIfStale(Version)
@@ -231,7 +231,7 @@ func initOAuthClient() error {
 
 func newRequestReporter(token string) *reporting.Reporter {
 	requestReporter = reporting.NewReporter(reporting.Options{
-		Enabled: cfg.Telemetry,
+		Enabled: true,
 		Host:    "",
 		Token:   token,
 	})
