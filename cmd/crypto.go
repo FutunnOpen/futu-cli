@@ -13,8 +13,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/FutunnOpen/futu-cli/internal/output"
-	"github.com/FutunnOpen/futu-cli/internal/service"
+	"github.com/futunn/futu/internal/output"
+	"github.com/futunn/futu/internal/service"
 )
 
 const (
@@ -85,50 +85,50 @@ type cryptoFillOrderSummary struct {
 
 var cryptoCmd = &cobra.Command{
 	Use:   "crypto",
-	Short: "加密货币交易",
-	Long:  "加密货币交易账户、资金、订单和成交管理。",
+	Short: "Cryptocurrency trading",
+	Long:  "Manage cryptocurrency trading accounts, balances, orders, and fills.",
 }
 
 var cryptoAccountCmd = &cobra.Command{
 	Use:   "account",
-	Short: "加密货币账户管理",
-	Long:  "查询可用于加密货币交易的授权账户。",
+	Short: "Cryptocurrency account management",
+	Long:  "List authorized accounts that can be used for cryptocurrency trading.",
 }
 
 var cryptoAccountListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "查询加密货币授权账户",
-	Long:  "查询当前用户可访问且已开通加密货币交易市场的授权账户。",
+	Short: "List cryptocurrency accounts",
+	Long:  "List accounts available to the current user that have cryptocurrency trading enabled.",
 	Args:  cobra.NoArgs,
 	RunE:  runCryptoAccountList,
 }
 
 var cryptoBalanceCmd = &cobra.Command{
 	Use:   "balance",
-	Short: "查询加密货币账户总余额",
-	Long:  "查询指定账户的加密货币总资产，包含各币种现金余额和数字资产持仓。",
+	Short: "Query cryptocurrency account balance",
+	Long:  "Query total cryptocurrency account assets, including cash balances and digital asset positions.",
 	Args:  cobra.NoArgs,
 	RunE:  runCryptoBalance,
 }
 
 var cryptoMaxQtyCmd = &cobra.Command{
 	Use:   "max-qty <symbol>",
-	Short: "查询加密货币最大买卖数量",
-	Long:  "查询指定加密货币交易对的最大现金买入数量、最大可卖数量和最大现金买入金额。",
+	Short: "Query maximum cryptocurrency tradable quantity",
+	Long:  "Query the maximum cash buy quantity, maximum sell quantity, and maximum cash buy amount for the specified cryptocurrency pair.",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runCryptoMaxQty,
 }
 
 var cryptoOrderCmd = &cobra.Command{
 	Use:   "order",
-	Short: "加密货币订单管理",
-	Long:  "加密货币下单、改单、撤单和订单查询。",
+	Short: "Cryptocurrency order management",
+	Long:  "Place, modify, cancel, and query cryptocurrency orders.",
 }
 
 var cryptoOrderPlaceCmd = &cobra.Command{
 	Use:   "place <symbol>",
-	Short: "加密货币下单",
-	Long:  "提交加密货币订单，支持限价单、市价单和条件单。",
+	Short: "Place a cryptocurrency order",
+	Long:  "Place a cryptocurrency order, supporting limit, market, and conditional orders.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runCryptoPlaceOrder(cmd, args[0], "")
@@ -137,8 +137,8 @@ var cryptoOrderPlaceCmd = &cobra.Command{
 
 var cryptoOrderBuyCmd = &cobra.Command{
 	Use:   "buy <symbol>",
-	Short: "加密货币买入",
-	Long:  "提交加密货币买入订单。",
+	Short: "Place a cryptocurrency buy order",
+	Long:  "Place a cryptocurrency buy order.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runCryptoPlaceOrder(cmd, args[0], cryptoSideBuy)
@@ -147,8 +147,8 @@ var cryptoOrderBuyCmd = &cobra.Command{
 
 var cryptoOrderSellCmd = &cobra.Command{
 	Use:   "sell <symbol>",
-	Short: "加密货币卖出",
-	Long:  "提交加密货币卖出订单。",
+	Short: "Place a cryptocurrency sell order",
+	Long:  "Place a cryptocurrency sell order.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runCryptoPlaceOrder(cmd, args[0], cryptoSideSell)
@@ -157,62 +157,62 @@ var cryptoOrderSellCmd = &cobra.Command{
 
 var cryptoOrderModifyCmd = &cobra.Command{
 	Use:   "modify <order-id>",
-	Short: "加密货币改单",
-	Long:  "修改指定加密货币订单的价格、数量或条件单信息。",
+	Short: "Modify a cryptocurrency order",
+	Long:  "Modify the price, quantity, or conditional information of the specified cryptocurrency order.",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runCryptoModifyOrder,
 }
 
 var cryptoOrderCancelCmd = &cobra.Command{
 	Use:   "cancel <order-id>",
-	Short: "加密货币撤单",
-	Long:  "撤销指定加密货币订单。",
+	Short: "Cancel a cryptocurrency order",
+	Long:  "Cancel the specified cryptocurrency order.",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runCryptoCancelOrder,
 }
 
 var cryptoOrderListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "查看加密货币未完成订单",
-	Long:  "查询当前账户加密货币未完成订单列表，支持分页。",
+	Short: "List open cryptocurrency orders",
+	Long:  "List open cryptocurrency orders for the current account, with pagination support.",
 	Args:  cobra.NoArgs,
 	RunE:  runCryptoListOrders,
 }
 
 var cryptoOrderHistoryCmd = &cobra.Command{
 	Use:   "history",
-	Short: "查看加密货币历史订单",
-	Long:  "查询当前账户加密货币历史订单列表，支持时间范围、交易对、状态、方向和订单类型过滤。",
+	Short: "List historical cryptocurrency orders",
+	Long:  "List historical cryptocurrency orders for the current account, with filters for time range, symbol, status, side, and order type.",
 	Args:  cobra.NoArgs,
 	RunE:  runCryptoHistoryOrders,
 }
 
 var cryptoOrderDetailCmd = &cobra.Command{
 	Use:   "detail <order-id> [order-id...]",
-	Short: "查看加密货币订单详情",
-	Long:  "批量获取指定加密货币订单 ID 的详情，最多一次查询 20 个订单。",
+	Short: "Show cryptocurrency order details",
+	Long:  "Get details for the specified cryptocurrency order IDs. You can query up to 20 orders at once.",
 	Args:  cobra.RangeArgs(1, maxCryptoOrderIDs),
 	RunE:  runCryptoOrderDetails,
 }
 
 var cryptoDealCmd = &cobra.Command{
 	Use:   "deal <order-id>",
-	Short: "查询加密货币成交明细",
-	Long:  "查询指定加密货币订单的成交明细，支持分页。",
+	Short: "Query cryptocurrency fills",
+	Long:  "Query fills for the specified cryptocurrency order, with pagination support.",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runCryptoFills,
 }
 
 var cryptoDealHistoryCmd = &cobra.Command{
 	Use:   "history",
-	Short: "查询加密货币历史成交",
-	Long:  "查询当前账户加密货币历史成交列表，支持时间范围、交易对和分页过滤。",
+	Short: "Query historical cryptocurrency fills",
+	Long:  "Query historical cryptocurrency fills for the current account, with filters for time range, symbol, and pagination.",
 	Args:  cobra.NoArgs,
 	RunE:  runCryptoHistoryFills,
 }
 
 func init() {
-	cryptoBalanceCmd.Flags().StringP("account", "a", "", "交易账户（默认: 配置 default_account）")
+	cryptoBalanceCmd.Flags().StringP("account", "a", "", "Trading account ID (default: config default_account)")
 	registerCryptoMaxQtyFlags(cryptoMaxQtyCmd)
 	registerCryptoOrderFlags(cryptoOrderPlaceCmd, true)
 	registerCryptoOrderFlags(cryptoOrderBuyCmd, false)
@@ -241,36 +241,36 @@ func init() {
 }
 
 func registerCryptoMaxQtyFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&cryptoOrderFlags.account, "account", "a", "", "交易账户（默认: 配置 default_account）")
-	cmd.Flags().StringVarP(&cryptoOrderFlags.orderType, "type", "t", defaultCryptoOrderType, "订单类型（默认: LIMIT）")
-	cmd.Flags().StringVar(&cryptoOrderFlags.currency, "currency", defaultCryptoCurrency, "结算币种（默认: USD）")
-	cmd.Flags().StringVar(&cryptoOrderFlags.coin, "coin", "", "交易币种（默认: 从 symbol 推断）")
-	cmd.Flags().StringVar(&cryptoOrderFlags.price, "price", "", "参考价格（默认: 空；限价类订单必填且需大于 0）")
+	cmd.Flags().StringVarP(&cryptoOrderFlags.account, "account", "a", "", "Trading account ID (default: config default_account)")
+	cmd.Flags().StringVarP(&cryptoOrderFlags.orderType, "type", "t", defaultCryptoOrderType, "Order type (default: LIMIT)")
+	cmd.Flags().StringVar(&cryptoOrderFlags.currency, "currency", defaultCryptoCurrency, "Settlement currency (default: USD)")
+	cmd.Flags().StringVar(&cryptoOrderFlags.coin, "coin", "", "Base coin (default: inferred from symbol)")
+	cmd.Flags().StringVar(&cryptoOrderFlags.price, "price", "", "Reference price (default: empty; required and must be positive for limit-like orders)")
 }
 
 func registerCryptoOrderFlags(cmd *cobra.Command, includeSide bool) {
-	cmd.Flags().StringVarP(&cryptoOrderFlags.account, "account", "a", "", "交易账户（默认: 配置 default_account）")
+	cmd.Flags().StringVarP(&cryptoOrderFlags.account, "account", "a", "", "Trading account ID (default: config default_account)")
 	if includeSide {
-		cmd.Flags().StringVar(&cryptoOrderFlags.side, "side", "", "交易方向: BUY, SELL（必填）")
+		cmd.Flags().StringVar(&cryptoOrderFlags.side, "side", "", "Order side: BUY, SELL (required)")
 		_ = cmd.MarkFlagRequired("side")
 	}
-	cmd.Flags().StringVar(&cryptoOrderFlags.reqID, "req-id", "", "幂等 ID（默认: 自动生成）")
-	cmd.Flags().StringVarP(&cryptoOrderFlags.orderType, "type", "t", defaultCryptoOrderType, "订单类型（默认: LIMIT）")
-	cmd.Flags().StringVar(&cryptoOrderFlags.timeInForce, "time-in-force", defaultCryptoTimeInForce, "订单有效期（默认: TIF_GTC）")
-	cmd.Flags().StringVar(&cryptoOrderFlags.price, "price", "", "订单价格（默认: 空；限价类订单必填）")
-	cmd.Flags().StringVar(&cryptoOrderFlags.qty, "qty", "", "币数量（默认: 空；与 --cash-qty 互斥）")
-	cmd.Flags().StringVar(&cryptoOrderFlags.cashOrderQty, "cash-qty", "", "金额下单数量（默认: 空；与 --qty 互斥，不支持卖出）")
-	cmd.Flags().StringVar(&cryptoOrderFlags.expireTime, "expire-time", "", "GTD 订单过期时间（默认: 空）")
-	cmd.Flags().StringVar(&cryptoOrderFlags.conditionalInfo, "conditional-info", "", "条件单 JSON（默认: 空）")
+	cmd.Flags().StringVar(&cryptoOrderFlags.reqID, "req-id", "", "Idempotency ID (default: auto-generated)")
+	cmd.Flags().StringVarP(&cryptoOrderFlags.orderType, "type", "t", defaultCryptoOrderType, "Order type (default: LIMIT)")
+	cmd.Flags().StringVar(&cryptoOrderFlags.timeInForce, "time-in-force", defaultCryptoTimeInForce, "Time in force (default: TIF_GTC)")
+	cmd.Flags().StringVar(&cryptoOrderFlags.price, "price", "", "Order price (default: empty; required for limit-like orders)")
+	cmd.Flags().StringVar(&cryptoOrderFlags.qty, "qty", "", "Coin quantity (default: empty; mutually exclusive with --cash-qty)")
+	cmd.Flags().StringVar(&cryptoOrderFlags.cashOrderQty, "cash-qty", "", "Cash amount order quantity (default: empty; mutually exclusive with --qty; not supported for sell orders)")
+	cmd.Flags().StringVar(&cryptoOrderFlags.expireTime, "expire-time", "", "GTD order expiration time (default: empty)")
+	cmd.Flags().StringVar(&cryptoOrderFlags.conditionalInfo, "conditional-info", "", "Conditional order JSON (default: empty)")
 }
 
 func registerCryptoModifyOrderFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&cryptoOrderFlags.account, "account", "a", "", "交易账户（默认: 配置 default_account）")
-	cmd.Flags().StringVar(&cryptoOrderFlags.reqID, "req-id", "", "幂等 ID（默认: 自动生成）")
-	cmd.Flags().StringVar(&cryptoOrderFlags.price, "price", "", "修改后的订单价格（必填；止盈/止损市价单填 0）")
-	cmd.Flags().StringVar(&cryptoOrderFlags.qty, "qty", "", "修改后的订单数量（必填）")
-	cmd.Flags().Int64Var(&cryptoOrderFlags.orderVersion, "order-version", 0, "订单版本号（必填；来自订单详情 version）")
-	cmd.Flags().StringVar(&cryptoOrderFlags.conditionalInfo, "conditional-info", "", "条件单 JSON（必填）")
+	cmd.Flags().StringVarP(&cryptoOrderFlags.account, "account", "a", "", "Trading account ID (default: config default_account)")
+	cmd.Flags().StringVar(&cryptoOrderFlags.reqID, "req-id", "", "Idempotency ID (default: auto-generated)")
+	cmd.Flags().StringVar(&cryptoOrderFlags.price, "price", "", "Updated order price (required; use 0 for stop-profit/stop-loss market orders)")
+	cmd.Flags().StringVar(&cryptoOrderFlags.qty, "qty", "", "Updated order quantity (required)")
+	cmd.Flags().Int64Var(&cryptoOrderFlags.orderVersion, "order-version", 0, "Order version (required; from order detail version)")
+	cmd.Flags().StringVar(&cryptoOrderFlags.conditionalInfo, "conditional-info", "", "Conditional order JSON (required)")
 	_ = cmd.MarkFlagRequired("price")
 	_ = cmd.MarkFlagRequired("qty")
 	_ = cmd.MarkFlagRequired("order-version")
@@ -278,48 +278,48 @@ func registerCryptoModifyOrderFlags(cmd *cobra.Command) {
 }
 
 func registerCryptoCancelOrderFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&cryptoOrderFlags.account, "account", "a", "", "交易账户（默认: 配置 default_account）")
-	cmd.Flags().StringVar(&cryptoOrderFlags.reqID, "req-id", "", "幂等 ID（默认: 自动生成）")
+	cmd.Flags().StringVarP(&cryptoOrderFlags.account, "account", "a", "", "Trading account ID (default: config default_account)")
+	cmd.Flags().StringVar(&cryptoOrderFlags.reqID, "req-id", "", "Idempotency ID (default: auto-generated)")
 }
 
 func registerCryptoListOrderFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&cryptoOrderFlags.account, "account", "a", "", "交易账户（默认: 配置 default_account）")
-	cmd.Flags().IntVar(&cryptoOrderFlags.pageSize, "page-size", service.DefaultCryptoPageSize, "每页数量，最大 50（默认: 50）")
-	cmd.Flags().StringVar(&cryptoOrderFlags.pageFlag, "page-flag", "", "分页游标（默认: 空，查询第一页）")
+	cmd.Flags().StringVarP(&cryptoOrderFlags.account, "account", "a", "", "Trading account ID (default: config default_account)")
+	cmd.Flags().IntVar(&cryptoOrderFlags.pageSize, "page-size", service.DefaultCryptoPageSize, "Page size, max 50 (default: 50)")
+	cmd.Flags().StringVar(&cryptoOrderFlags.pageFlag, "page-flag", "", "Pagination cursor (default: empty, first page)")
 }
 
 func registerCryptoHistoryOrderFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&cryptoOrderFlags.account, "account", "a", "", "交易账户（默认: 配置 default_account）")
-	cmd.Flags().Int64Var(&cryptoOrderFlags.start, "start", 0, "查询开始时间，微秒时间戳（默认: 最近 3 个月）")
-	cmd.Flags().Int64Var(&cryptoOrderFlags.end, "end", 0, "查询结束时间，微秒时间戳（默认: 当前时间）")
-	cmd.Flags().IntVar(&cryptoOrderFlags.pageSize, "page-size", service.DefaultCryptoPageSize, "每页数量，最大 50（默认: 50）")
-	cmd.Flags().StringVar(&cryptoOrderFlags.pageFlag, "page-flag", "", "分页游标（默认: 空，查询第一页）")
-	cmd.Flags().StringVar(&cryptoOrderFlags.symbol, "symbol", "", "交易对过滤，如 BTCUSD（默认: 不过滤）")
-	cmd.Flags().StringVar(&cryptoOrderFlags.orderStatus, "order-status", "", "订单状态过滤，支持逗号分隔多选（默认: 不过滤）")
-	cmd.Flags().StringVar(&cryptoOrderFlags.currency, "currency", "", "结算币种过滤，支持逗号分隔多选（默认: 不过滤）")
-	cmd.Flags().StringVar(&cryptoOrderFlags.side, "side", "", "交易方向过滤，支持逗号分隔多选: BUY, SELL（默认: 不过滤）")
-	cmd.Flags().StringVar(&cryptoOrderFlags.orderType, "type", "", "订单类型过滤，支持逗号分隔多选（默认: 不过滤）")
+	cmd.Flags().StringVarP(&cryptoOrderFlags.account, "account", "a", "", "Trading account ID (default: config default_account)")
+	cmd.Flags().Int64Var(&cryptoOrderFlags.start, "start", 0, "Start time as a microsecond timestamp (default: last 3 months)")
+	cmd.Flags().Int64Var(&cryptoOrderFlags.end, "end", 0, "End time as a microsecond timestamp (default: now)")
+	cmd.Flags().IntVar(&cryptoOrderFlags.pageSize, "page-size", service.DefaultCryptoPageSize, "Page size, max 50 (default: 50)")
+	cmd.Flags().StringVar(&cryptoOrderFlags.pageFlag, "page-flag", "", "Pagination cursor (default: empty, first page)")
+	cmd.Flags().StringVar(&cryptoOrderFlags.symbol, "symbol", "", "Symbol filter, for example BTCUSD (default: no filter)")
+	cmd.Flags().StringVar(&cryptoOrderFlags.orderStatus, "order-status", "", "Order status filter; comma-separated values supported (default: no filter)")
+	cmd.Flags().StringVar(&cryptoOrderFlags.currency, "currency", "", "Settlement currency filter; comma-separated values supported (default: no filter)")
+	cmd.Flags().StringVar(&cryptoOrderFlags.side, "side", "", "Order side filter; comma-separated values supported: BUY, SELL (default: no filter)")
+	cmd.Flags().StringVar(&cryptoOrderFlags.orderType, "type", "", "Order type filter; comma-separated values supported (default: no filter)")
 }
 
 func registerCryptoDetailOrderFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&cryptoOrderFlags.account, "account", "a", "", "交易账户（默认: 配置 default_account）")
+	cmd.Flags().StringVarP(&cryptoOrderFlags.account, "account", "a", "", "Trading account ID (default: config default_account)")
 }
 
 func registerCryptoDealFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&cryptoOrderFlags.account, "account", "a", "", "交易账户（默认: 配置 default_account）")
-	cmd.Flags().IntVar(&cryptoOrderFlags.pageSize, "page-size", service.DefaultCryptoPageSize, "每页数量，最大 50（默认: 50）")
-	cmd.Flags().StringVar(&cryptoOrderFlags.pageFlag, "page-flag", "", "分页游标（默认: 空，查询第一页）")
-	cmd.Flags().BoolVar(&cryptoOrderFlags.groupByOrder, "group-by-order", false, "按订单汇总成交（默认: false）")
+	cmd.Flags().StringVarP(&cryptoOrderFlags.account, "account", "a", "", "Trading account ID (default: config default_account)")
+	cmd.Flags().IntVar(&cryptoOrderFlags.pageSize, "page-size", service.DefaultCryptoPageSize, "Page size, max 50 (default: 50)")
+	cmd.Flags().StringVar(&cryptoOrderFlags.pageFlag, "page-flag", "", "Pagination cursor (default: empty, first page)")
+	cmd.Flags().BoolVar(&cryptoOrderFlags.groupByOrder, "group-by-order", false, "Group fills by order (default: false)")
 }
 
 func registerCryptoDealHistoryFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&cryptoOrderFlags.account, "account", "a", "", "交易账户（默认: 配置 default_account）")
-	cmd.Flags().Int64Var(&cryptoOrderFlags.start, "start", 0, "查询开始时间，微秒时间戳（默认: 最近 3 个月）")
-	cmd.Flags().Int64Var(&cryptoOrderFlags.end, "end", 0, "查询结束时间，微秒时间戳（默认: 当前时间）")
-	cmd.Flags().IntVar(&cryptoOrderFlags.pageSize, "page-size", service.DefaultCryptoPageSize, "每页数量，最大 50（默认: 50）")
-	cmd.Flags().StringVar(&cryptoOrderFlags.pageFlag, "page-flag", "", "分页游标（默认: 空，查询第一页）")
-	cmd.Flags().StringVar(&cryptoOrderFlags.symbol, "symbol", "", "交易对过滤，如 BTCUSD（默认: 不过滤）")
-	cmd.Flags().BoolVar(&cryptoOrderFlags.groupByOrder, "group-by-order", false, "按订单汇总成交（默认: false）")
+	cmd.Flags().StringVarP(&cryptoOrderFlags.account, "account", "a", "", "Trading account ID (default: config default_account)")
+	cmd.Flags().Int64Var(&cryptoOrderFlags.start, "start", 0, "Start time as a microsecond timestamp (default: last 3 months)")
+	cmd.Flags().Int64Var(&cryptoOrderFlags.end, "end", 0, "End time as a microsecond timestamp (default: now)")
+	cmd.Flags().IntVar(&cryptoOrderFlags.pageSize, "page-size", service.DefaultCryptoPageSize, "Page size, max 50 (default: 50)")
+	cmd.Flags().StringVar(&cryptoOrderFlags.pageFlag, "page-flag", "", "Pagination cursor (default: empty, first page)")
+	cmd.Flags().StringVar(&cryptoOrderFlags.symbol, "symbol", "", "Symbol filter, for example BTCUSD (default: no filter)")
+	cmd.Flags().BoolVar(&cryptoOrderFlags.groupByOrder, "group-by-order", false, "Group fills by order (default: false)")
 }
 
 func runCryptoAccountList(cmd *cobra.Command, _ []string) error {

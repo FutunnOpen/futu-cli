@@ -2,23 +2,28 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
 	"strings"
 
-	"github.com/FutunnOpen/futu-cli/internal/client"
+	"github.com/futunn/futu/internal/client"
 )
 
 // Endpoint names for quote API routes.
 const (
-	endpointStockQuote  = "quote.stock_quote"
-	endpointSnapshot    = "quote.snapshot"
-	endpointKLine       = "quote.kline"
-	endpointDepth       = "quote.depth"
-	endpointTicker      = "quote.ticker"
-	endpointRank        = "quote.rank"
-	endpointOptionChain = "quote.option.chain"
+	endpointStockQuote       = "quote.stock_quote"
+	endpointMarketSnapshot   = "quote.market_snapshot"
+	endpointCurKLine         = "quote.cur_kline"
+	endpointHistoryKLine     = "quote.history_kline"
+	endpointOrderBook        = "quote.order_book"
+	endpointRTTicker         = "quote.rt_ticker"
+	endpointRTData           = "quote.rt_data"
+	endpointStockBasicInfo   = "quote.stock_basicinfo"
+	endpointOptionChain      = "quote.option_chain"
+	endpointOptionExpiration = "quote.option_expiration_date"
+	endpointStockScreen      = "quote.stock_screen"
 )
 
 // QuoteService provides access to market data endpoints.
@@ -31,79 +36,54 @@ func NewQuoteService(c *client.Client) *QuoteService {
 	return &QuoteService{client: c}
 }
 
+// Call invokes a named BFF quote endpoint and returns the decoded envelope.
+func (s *QuoteService) Call(ctx context.Context, endpoint string, opts client.CallOpts) (*BFFResult, error) {
+	result, err := s.callBFF(ctx, endpoint, opts)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", endpoint, err)
+	}
+	return result, nil
+}
+
+// CurKLineParams maps quote.cur_kline query parameters.
+type CurKLineParams struct {
+	Num          int
+	KType        int
+	AUType       int
+	ExtendedTime int
+	PredSide     int
+}
+
+// HistoryKLineParams maps quote.history_kline query parameters.
+type HistoryKLineParams struct {
+	Start        string
+	End          string
+	NextTime     int64
+	KType        int
+	AUType       int
+	Num          int
+	ExtendedTime int
+	PredSide     int
+}
+
+// RTTickerParams maps quote.rt_ticker query parameters.
+type RTTickerParams struct {
+	Num     int
+	Periods []string
+}
+
+// OptionChainParams maps quote.option_chain query parameters.
+type OptionChainParams struct {
+	Start           string
+	End             string
+	IndexOptionType int
+	HasIndexType    bool
+	FilterStandard  string
+}
+
 // --- Response types ---
 
-// Snapshot represents a point-in-time quote for a single security.
-type Snapshot struct {
-	Symbol    string  `json:"symbol"`
-	Name      string  `json:"name"`
-	LastPrice float64 `json:"last_price"`
-	Change    float64 `json:"change"`
-	ChangePct float64 `json:"change_pct"`
-	Volume    int64   `json:"volume"`
-	Turnover  float64 `json:"turnover"`
-	High      float64 `json:"high"`
-	Low       float64 `json:"low"`
-	Open      float64 `json:"open"`
-	PrevClose float64 `json:"prev_close"`
-	Timestamp int64   `json:"timestamp"`
-}
-
-// KLine represents a single candlestick bar.
-type KLine struct {
-	Time     int64   `json:"time"`
-	Open     float64 `json:"open"`
-	High     float64 `json:"high"`
-	Low      float64 `json:"low"`
-	Close    float64 `json:"close"`
-	Volume   int64   `json:"volume"`
-	Turnover float64 `json:"turnover"`
-}
-
-// DepthEntry represents one price level in the order book.
-type DepthEntry struct {
-	Price  float64 `json:"price"`
-	Volume int64   `json:"volume"`
-	Order  int     `json:"order"`
-}
-
-// Depth represents the full order book for a symbol.
-type Depth struct {
-	Asks []DepthEntry `json:"asks"`
-	Bids []DepthEntry `json:"bids"`
-}
-
-// Ticker represents a single tick (trade) record.
-type Ticker struct {
-	Time      int64   `json:"time"`
-	Price     float64 `json:"price"`
-	Volume    int64   `json:"volume"`
-	Direction string  `json:"direction"` // "B"/"S"/"N"
-}
-
-// RankItem represents one entry in a market ranking list.
-type RankItem struct {
-	Symbol    string  `json:"symbol"`
-	Name      string  `json:"name"`
-	LastPrice float64 `json:"last_price"`
-	ChangePct float64 `json:"change_pct"`
-	Volume    int64   `json:"volume"`
-	Turnover  float64 `json:"turnover"`
-}
-
-// OptionChainItem represents a single option contract in a chain.
-type OptionChainItem struct {
-	Symbol      string  `json:"symbol"`
-	Name        string  `json:"name"`
-	StrikePrice float64 `json:"strike_price"`
-	ExpiryDate  string  `json:"expiry_date"`
-	Type        string  `json:"type"` // "C"/"P"
-	LastPrice   float64 `json:"last_price"`
-	ImpliedVol  float64 `json:"implied_vol"`
-	OpenInt     int64   `json:"open_interest"`
-}
-
-// StockQuote represents a real-time quote from the Futu stock-quote API.
+// StockQuote represents a real-time quote from quote.stock_quote.
 type StockQuote struct {
 	Code           string         `json:"code"`
 	Name           string         `json:"name"`
@@ -173,203 +153,365 @@ type MarketSession struct {
 	Amplitude  float64 `json:"amplitude"`
 }
 
-// --- API response wrappers (one per endpoint) ---
-
-type stockQuoteRequest struct {
-	CodeList []string `json:"code_list"`
+type stockQuoteData struct {
+	QuoteList []StockQuote `json:"quote_list"`
 }
 
-type stockQuoteResponse struct {
-	RetCode int    `json:"ret_code"`
-	RetMsg  string `json:"ret_msg"`
-	Data    struct {
-		QuoteList []StockQuote `json:"quote_list"`
-	} `json:"data"`
+// RankItem represents one entry in a market ranking list.
+type RankItem struct {
+	Symbol    string  `json:"symbol"`
+	Name      string  `json:"name"`
+	LastPrice float64 `json:"last_price"`
+	ChangePct float64 `json:"change_pct"`
+	Volume    int64   `json:"volume"`
+	Turnover  float64 `json:"turnover"`
 }
 
-type snapshotResponse struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Data    struct {
-		List []Snapshot `json:"list"`
-	} `json:"data"`
-}
-
-type klineResponse struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Data    struct {
-		List []KLine `json:"list"`
-	} `json:"data"`
-}
-
-type depthResponse struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Data    Depth  `json:"data"`
-}
-
-type tickerResponse struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Data    struct {
-		List []Ticker `json:"list"`
-	} `json:"data"`
-}
-
-type rankResponse struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Data    struct {
-		List []RankItem `json:"list"`
-	} `json:"data"`
-}
-
-type optionChainResponse struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Data    struct {
-		List []OptionChainItem `json:"list"`
-	} `json:"data"`
-}
-
-// --- Service methods ---
-
-// GetStockQuote returns real-time quotes for the given Futu-format codes
-// (e.g. "HK.09988", "US.AAPL").
+// GetStockQuote returns real-time quotes for the given Futu-format codes.
 func (s *QuoteService) GetStockQuote(ctx context.Context, codes []string) ([]StockQuote, error) {
-	body := stockQuoteRequest{CodeList: codes}
-	var resp stockQuoteResponse
-	if err := s.client.Call(ctx, endpointStockQuote, client.CallOpts{Body: body}, &resp); err != nil {
+	result, err := s.callBFF(ctx, endpointStockQuote, client.CallOpts{
+		Body: map[string]any{"code_list": codes},
+	})
+	if err != nil {
 		return nil, fmt.Errorf("get stock quote: %w", err)
 	}
-	if err := checkRetCode(resp.RetCode, resp.RetMsg); err != nil {
-		return nil, err
+	var data stockQuoteData
+	if err := unmarshalBFFData(result.Data, &data); err != nil {
+		return nil, fmt.Errorf("decode stock quote: %w", err)
 	}
-	return resp.Data.QuoteList, nil
+	return data.QuoteList, nil
 }
 
-// GetSnapshot returns real-time snapshots for the given symbols.
-func (s *QuoteService) GetSnapshot(ctx context.Context, symbols []string) ([]Snapshot, error) {
-	params := url.Values{}
-	params.Set("symbols", strings.Join(symbols, ","))
-
-	var resp snapshotResponse
-	if err := s.client.Call(ctx, endpointSnapshot, client.CallOpts{Params: params}, &resp); err != nil {
-		return nil, fmt.Errorf("get snapshot: %w", err)
+// GetMarketSnapshot returns market snapshots for the given Futu-format codes.
+func (s *QuoteService) GetMarketSnapshot(ctx context.Context, codes []string) (*BFFResult, error) {
+	result, err := s.callBFF(ctx, endpointMarketSnapshot, client.CallOpts{
+		Body: map[string]any{"code_list": codes},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get market snapshot: %w", err)
 	}
-	if err := checkCode(resp.Code, resp.Message); err != nil {
-		return nil, err
-	}
-	return resp.Data.List, nil
+	return result, nil
 }
 
-// GetKLine returns candlestick bars for a symbol.
-func (s *QuoteService) GetKLine(ctx context.Context, symbol string, period string, count int) ([]KLine, error) {
-	params := buildKLineParams(symbol, period, count)
-
-	var resp klineResponse
-	if err := s.client.Call(ctx, endpointKLine, client.CallOpts{Params: params}, &resp); err != nil {
-		return nil, fmt.Errorf("get kline: %w", err)
+// GetCurKLine returns the latest N K-line bars for a symbol.
+func (s *QuoteService) GetCurKLine(ctx context.Context, symbol string, params CurKLineParams) (*BFFResult, error) {
+	query := url.Values{}
+	query.Set("num", strconv.Itoa(params.Num))
+	query.Set("ktype", strconv.Itoa(params.KType))
+	query.Set("autype", strconv.Itoa(params.AUType))
+	query.Set("extended_time", strconv.Itoa(params.ExtendedTime))
+	query.Set("pred_side", strconv.Itoa(params.PredSide))
+	result, err := s.callBFF(ctx, endpointCurKLine, client.CallOpts{
+		PathParams: map[string]string{"symbol": symbol},
+		Params:     query,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get cur kline: %w", err)
 	}
-	if err := checkCode(resp.Code, resp.Message); err != nil {
-		return nil, err
-	}
-	return resp.Data.List, nil
+	return result, nil
 }
 
-// GetDepth returns the order book for a symbol.
-func (s *QuoteService) GetDepth(ctx context.Context, symbol string) (*Depth, error) {
-	params := url.Values{}
-	params.Set("symbol", symbol)
-
-	var resp depthResponse
-	if err := s.client.Call(ctx, endpointDepth, client.CallOpts{Params: params}, &resp); err != nil {
-		return nil, fmt.Errorf("get depth: %w", err)
+// GetHistoryKLine returns historical K-line bars for a symbol.
+func (s *QuoteService) GetHistoryKLine(ctx context.Context, symbol string, params HistoryKLineParams) (*BFFResult, error) {
+	query := url.Values{}
+	if len(params.Start) > 0 {
+		query.Set("start", params.Start)
 	}
-	if err := checkCode(resp.Code, resp.Message); err != nil {
-		return nil, err
+	if len(params.End) > 0 {
+		query.Set("end", params.End)
 	}
-	return &resp.Data, nil
+	if params.NextTime != 0 {
+		query.Set("next_time", strconv.FormatInt(params.NextTime, 10))
+	}
+	query.Set("ktype", strconv.Itoa(params.KType))
+	query.Set("autype", strconv.Itoa(params.AUType))
+	query.Set("num", strconv.Itoa(params.Num))
+	query.Set("extended_time", strconv.Itoa(params.ExtendedTime))
+	query.Set("pred_side", strconv.Itoa(params.PredSide))
+	result, err := s.callBFF(ctx, endpointHistoryKLine, client.CallOpts{
+		PathParams: map[string]string{"symbol": symbol},
+		Params:     query,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get history kline: %w", err)
+	}
+	return result, nil
 }
 
-// GetTicker returns tick-by-tick trades for a symbol.
-func (s *QuoteService) GetTicker(ctx context.Context, symbol string, count int) ([]Ticker, error) {
-	params := url.Values{}
-	params.Set("symbol", symbol)
-	params.Set("count", strconv.Itoa(count))
+// GetOrderBook returns the order book for a symbol.
+func (s *QuoteService) GetOrderBook(ctx context.Context, code string, num int, numSet bool) (*BFFResult, error) {
+	body := map[string]any{"code": code}
+	if numSet {
+		body["num"] = num
+	}
+	result, err := s.callBFF(ctx, endpointOrderBook, client.CallOpts{Body: body})
+	if err != nil {
+		return nil, fmt.Errorf("get order book: %w", err)
+	}
+	return result, nil
+}
 
-	var resp tickerResponse
-	if err := s.client.Call(ctx, endpointTicker, client.CallOpts{Params: params}, &resp); err != nil {
-		return nil, fmt.Errorf("get ticker: %w", err)
+// GetRTTicker returns the latest tick trades for a symbol.
+func (s *QuoteService) GetRTTicker(ctx context.Context, symbol string, params RTTickerParams) (*BFFResult, error) {
+	query := url.Values{}
+	query.Set("num", strconv.Itoa(params.Num))
+	for _, period := range params.Periods {
+		query.Add("period", period)
 	}
-	if err := checkCode(resp.Code, resp.Message); err != nil {
-		return nil, err
+	result, err := s.callBFF(ctx, endpointRTTicker, client.CallOpts{
+		PathParams: map[string]string{"symbol": symbol},
+		Params:     query,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get rt ticker: %w", err)
 	}
-	return resp.Data.List, nil
+	return result, nil
+}
+
+// GetRTData returns intraday time-share data for a symbol.
+func (s *QuoteService) GetRTData(ctx context.Context, symbol, section string) (*BFFResult, error) {
+	query := url.Values{}
+	query.Set("request_section", section)
+	result, err := s.callBFF(ctx, endpointRTData, client.CallOpts{
+		PathParams: map[string]string{"symbol": symbol},
+		Params:     query,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get rt data: %w", err)
+	}
+	return result, nil
+}
+
+// GetStockBasicInfo returns static security info for the given codes.
+func (s *QuoteService) GetStockBasicInfo(ctx context.Context, codes []string) (*BFFResult, error) {
+	result, err := s.callBFF(ctx, endpointStockBasicInfo, client.CallOpts{
+		Body: map[string]any{"code_list": codes},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get stock basicinfo: %w", err)
+	}
+	return result, nil
+}
+
+// GetOptionChain returns the option chain for an underlying symbol.
+func (s *QuoteService) GetOptionChain(ctx context.Context, symbol string, params OptionChainParams) (*BFFResult, error) {
+	query := url.Values{}
+	if len(params.Start) > 0 {
+		query.Set("start", params.Start)
+	}
+	if len(params.End) > 0 {
+		query.Set("end", params.End)
+	}
+	if params.HasIndexType {
+		query.Set("index_option_type", strconv.Itoa(params.IndexOptionType))
+	}
+	if len(params.FilterStandard) > 0 {
+		query.Set("filter_standard", params.FilterStandard)
+	}
+	result, err := s.callBFF(ctx, endpointOptionChain, client.CallOpts{
+		PathParams: map[string]string{"symbol": symbol},
+		Params:     query,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get option chain: %w", err)
+	}
+	return result, nil
+}
+
+// GetOptionExpirationDates returns future/past strike dates for an underlying.
+func (s *QuoteService) GetOptionExpirationDates(ctx context.Context, symbol string, params OptionChainParams) ([]string, error) {
+	query := url.Values{}
+	if params.HasIndexType {
+		query.Set("index_option_type", strconv.Itoa(params.IndexOptionType))
+	}
+	if len(params.FilterStandard) > 0 {
+		query.Set("filter_standard", params.FilterStandard)
+	}
+	result, err := s.callBFF(ctx, endpointOptionExpiration, client.CallOpts{
+		PathParams: map[string]string{"symbol": symbol},
+		Params:     query,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get option expiration: %w", err)
+	}
+	var payload struct {
+		ExpirationList []struct {
+			StrikeTime string `json:"strike_time"`
+		} `json:"expiration_list"`
+	}
+	if err := unmarshalBFFData(result.Data, &payload); err != nil {
+		return nil, fmt.Errorf("decode option expiration: %w", err)
+	}
+	dates := make([]string, 0, len(payload.ExpirationList))
+	for _, item := range payload.ExpirationList {
+		if item.StrikeTime != "" {
+			dates = append(dates, item.StrikeTime)
+		}
+	}
+	return dates, nil
+}
+
+const (
+	rankPriceScale    = 1e9
+	rankPercentScale  = 1e3
+	rankTurnoverScale = 1e3
+
+	rankPropPrice     = 2220
+	rankPropChange    = 3102
+	rankPropVolume    = 3104
+	rankPropTurnover  = 3105
+	rankPropAmplitude = 3103
+
+	rankSortDesc = 2
+	rankSortAsc  = 1
+)
+
+var rankMarketIDs = map[string]int{
+	"HK": 1,
+	"US": 2,
+	"CN": 3,
 }
 
 // GetRank returns a market ranking list.
 func (s *QuoteService) GetRank(ctx context.Context, rankType string, market string, count int) ([]RankItem, error) {
-	params := buildRankParams(rankType, market, count)
-
-	var resp rankResponse
-	if err := s.client.Call(ctx, endpointRank, client.CallOpts{Params: params}, &resp); err != nil {
+	marketID, ok := rankMarketIDs[strings.ToUpper(market)]
+	if !ok {
+		return nil, fmt.Errorf("unsupported market %q", market)
+	}
+	sortName, direction, err := rankSort(rankType)
+	if err != nil {
+		return nil, err
+	}
+	result, err := s.callBFF(ctx, endpointStockScreen, client.CallOpts{
+		Body: rankScreenBody(marketID, count, sortName, direction),
+	})
+	if err != nil {
 		return nil, fmt.Errorf("get rank: %w", err)
 	}
-	if err := checkCode(resp.Code, resp.Message); err != nil {
-		return nil, err
+	var payload struct {
+		Items []screenRankItem `json:"items"`
 	}
-	return resp.Data.List, nil
+	if err := unmarshalBFFData(result.Data, &payload); err != nil {
+		return nil, fmt.Errorf("decode rank: %w", err)
+	}
+	items := make([]RankItem, 0, len(payload.Items))
+	for _, item := range payload.Items {
+		items = append(items, item.toRankItem())
+	}
+	return items, nil
 }
 
-// GetOptionChain returns the option chain for an underlying symbol.
-func (s *QuoteService) GetOptionChain(ctx context.Context, symbol string) ([]OptionChainItem, error) {
-	params := url.Values{}
-	params.Set("symbol", symbol)
-
-	var resp optionChainResponse
-	if err := s.client.Call(ctx, endpointOptionChain, client.CallOpts{Params: params}, &resp); err != nil {
-		return nil, fmt.Errorf("get option chain: %w", err)
+func rankSort(rankType string) (int, int, error) {
+	switch rankType {
+	case "volume":
+		return rankPropVolume, rankSortDesc, nil
+	case "turnover":
+		return rankPropTurnover, rankSortDesc, nil
+	case "gainers":
+		return rankPropChange, rankSortDesc, nil
+	case "losers":
+		return rankPropChange, rankSortAsc, nil
+	case "amplitude":
+		return rankPropAmplitude, rankSortDesc, nil
+	default:
+		return 0, 0, fmt.Errorf("invalid rank type %q", rankType)
 	}
-	if err := checkCode(resp.Code, resp.Message); err != nil {
-		return nil, err
-	}
-	return resp.Data.List, nil
 }
 
-// --- Helpers ---
-
-// buildKLineParams constructs query parameters for the kline endpoint.
-func buildKLineParams(symbol, period string, count int) url.Values {
-	params := url.Values{}
-	params.Set("symbol", symbol)
-	params.Set("period", period)
-	params.Set("count", strconv.Itoa(count))
-	return params
-}
-
-// buildRankParams constructs query parameters for the rank endpoint.
-func buildRankParams(rankType, market string, count int) url.Values {
-	params := url.Values{}
-	params.Set("rank_type", rankType)
-	params.Set("market", market)
-	params.Set("count", strconv.Itoa(count))
-	return params
-}
-
-// checkCode validates the API response code and returns an error for non-zero codes.
-func checkCode(code int, message string) error {
-	if code != 0 {
-		return fmt.Errorf("API error (code %d): %s", code, message)
+func rankScreenBody(marketID, count, sortName, direction int) map[string]any {
+	return map[string]any{
+		"screen_queries": []any{
+			map[string]any{
+				"simple_field_query": map[string]any{
+					"simple_field":      1,
+					"screen_value_list": []int{marketID},
+				},
+			},
+		},
+		"retrieve_queries": []any{
+			map[string]any{"simple_property": map[string]any{"name": rankPropPrice}},
+			map[string]any{"cumulative_property": map[string]any{"name": rankPropChange, "days": 1}},
+			map[string]any{"cumulative_property": map[string]any{"name": rankPropVolume, "days": 1}},
+			map[string]any{"cumulative_property": map[string]any{"name": rankPropTurnover, "days": 1}},
+		},
+		"sort": map[string]any{
+			"direction": direction,
+			"cumulative_property": map[string]any{
+				"name": sortName,
+				"days": 1,
+			},
+		},
+		"limit": count,
 	}
+}
+
+type screenRankItem struct {
+	Code    string            `json:"code"`
+	Name    string            `json:"name"`
+	SCName  string            `json:"sc_name"`
+	Results []screenRankValue `json:"results"`
+}
+
+type screenRankValue struct {
+	Simple     *screenPropertyResult `json:"simple_property_result"`
+	Cumulative *screenPropertyResult `json:"cumulative_property_result"`
+}
+
+type screenPropertyResult struct {
+	Property struct {
+		Name int `json:"name"`
+	} `json:"property"`
+	Value screenNumber `json:"value"`
+}
+
+type screenNumber float64
+
+func (n *screenNumber) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		return nil
+	}
+	var text string
+	if err := json.Unmarshal(data, &text); err == nil {
+		value, err := strconv.ParseFloat(text, 64)
+		if err != nil {
+			return err
+		}
+		*n = screenNumber(value)
+		return nil
+	}
+	var value float64
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*n = screenNumber(value)
 	return nil
 }
 
-// checkRetCode validates Futu API ret_code.
-func checkRetCode(code int, msg string) error {
-	if code != 0 {
-		return fmt.Errorf("API error (ret_code %d): %s", code, msg)
+func (item screenRankItem) toRankItem() RankItem {
+	name := item.SCName
+	if name == "" {
+		name = item.Name
 	}
-	return nil
+	out := RankItem{Symbol: item.Code, Name: name}
+	for _, result := range item.Results {
+		prop := result.Simple
+		if prop == nil {
+			prop = result.Cumulative
+		}
+		if prop == nil {
+			continue
+		}
+		value := float64(prop.Value)
+		switch prop.Property.Name {
+		case rankPropPrice:
+			out.LastPrice = value / rankPriceScale
+		case rankPropChange:
+			out.ChangePct = value / rankPercentScale
+		case rankPropVolume:
+			out.Volume = int64(value)
+		case rankPropTurnover:
+			out.Turnover = value / rankTurnoverScale
+		}
+	}
+	return out
 }

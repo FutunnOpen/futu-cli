@@ -19,13 +19,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FutunnOpen/futu-cli/internal/config"
+	"github.com/futunn/futu/internal/config"
 )
 
 const (
 	productName = "futu"
 	binaryName  = "futu"
-	npmPackage  = "@futunn/futu-cli"
 
 	envReleaseBase = "FUTU_CLI_RELEASE_BASE"
 	envLibc        = "FUTU_CLI_LIBC"
@@ -249,7 +248,7 @@ func defaultConfig() (releaseConfig, error) {
 		base = strings.TrimRight(defaultReleaseBase, "/")
 	}
 	if len(base) == 0 {
-		return releaseConfig{}, fmt.Errorf("GitHub release base is not configured; set %s or defaultReleaseBase", envReleaseBase)
+		return releaseConfig{}, fmt.Errorf("GitHub release base is not configured; set %s to https://github.com/<owner>/<repo>", envReleaseBase)
 	}
 	return releaseConfig{
 		ReleaseBase: base,
@@ -364,16 +363,11 @@ func tagFromLocation(location string) (string, error) {
 		return "", fmt.Errorf("missing latest release redirect location")
 	}
 	clean := strings.TrimRight(strings.Split(location, "?")[0], "/")
-	const releaseTagPath = "/releases/tag/"
-	index := strings.LastIndex(clean, releaseTagPath)
-	if index < 0 {
-		return "", fmt.Errorf("latest stable release not found; GitHub /releases/latest ignores prereleases")
-	}
-	tag := clean[index+len(releaseTagPath):]
-	if len(tag) == 0 || strings.Contains(tag, "/") {
+	index := strings.LastIndex(clean, "/")
+	if index < 0 || index == len(clean)-1 {
 		return "", fmt.Errorf("invalid latest release redirect location: %s", location)
 	}
-	return normalizeVersion(tag), nil
+	return normalizeVersion(clean[index+1:]), nil
 }
 
 func downloadFile(url, path string, timeout time.Duration) error {

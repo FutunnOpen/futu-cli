@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FutunnOpen/futu-cli/internal/reporting"
+	"github.com/futunn/futu/internal/reporting"
 )
 
 // ── OAuth mode headers ──────────────────────────────────────────────────────
@@ -93,8 +93,6 @@ func TestTradeMutationEndpointMatrixRequiresReportSource(t *testing.T) {
 		"crypto.order.place",
 		"crypto.order.modify",
 		"crypto.order.cancel",
-		"web3.swap.execute",
-		"web3.transfer",
 	}
 	for _, endpoint := range mutatingEndpoints {
 		if !Endpoints[endpoint].ReportSource {
@@ -106,8 +104,6 @@ func TestTradeMutationEndpointMatrixRequiresReportSource(t *testing.T) {
 		"quote.snapshot",
 		"trade.order.open",
 		"crypto.order.active",
-		"web3.swap.quote",
-		"web3.wallet.balance",
 	}
 	for _, endpoint := range readOnlyEndpoints {
 		if Endpoints[endpoint].ReportSource {

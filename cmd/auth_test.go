@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FutunnOpen/futu-cli/internal/auth"
-	"github.com/FutunnOpen/futu-cli/internal/config"
+	"github.com/futunn/futu/internal/auth"
+	"github.com/futunn/futu/internal/config"
 	"github.com/zalando/go-keyring"
 )
 

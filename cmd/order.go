@@ -14,9 +14,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/FutunnOpen/futu-cli/internal/output"
-	"github.com/FutunnOpen/futu-cli/internal/service"
-	"github.com/FutunnOpen/futu-cli/pkg/symbol"
+	"github.com/futunn/futu/internal/output"
+	"github.com/futunn/futu/internal/service"
+	"github.com/futunn/futu/pkg/symbol"
 )
 
 // Order side constants.
@@ -84,35 +84,35 @@ const (
 )
 
 var orderSideLabels = map[string]string{
-	"BUY":        "买入",
-	"SELL":       "卖出",
-	"SELL_SHORT": "卖空",
-	"BUY_BACK":   "买回",
+	"BUY":        "Buy",
+	"SELL":       "Sell",
+	"SELL_SHORT": "Sell Short",
+	"BUY_BACK":   "Buy Back",
 }
 
 var orderTypeLabels = map[string]string{
-	"LIMIT":             "限价单",
-	"MARKET":            "市价单",
-	"AUCTION":           "竞价市价单",
-	"AUCTION_LIMIT":     "竞价限价单",
-	"STOP":              "止损单",
-	"STOP_LIMIT":        "止损限价单",
-	"MARKET_IF_TOUCHED": "触及市价单",
-	"LIMIT_IF_TOUCHED":  "触及限价单",
-	orderTypeModified:   "已改单",
+	"LIMIT":             "Limit",
+	"MARKET":            "Market",
+	"AUCTION":           "Auction Market",
+	"AUCTION_LIMIT":     "Auction Limit",
+	"STOP":              "Stop",
+	"STOP_LIMIT":        "Stop Limit",
+	"MARKET_IF_TOUCHED": "Market If Touched",
+	"LIMIT_IF_TOUCHED":  "Limit If Touched",
+	orderTypeModified:   "Modified",
 }
 
 var orderStatusLabels = map[string]string{
-	"WAITING_SUBMIT": "等待提交",
-	"SUBMITTING":     "提交中",
-	"SUBMITTED":      "已提交",
-	"FILLED_PART":    "部分成交",
-	"FILLED_ALL":     "全部成交",
-	"CANCELLED_PART": "部分成交剩余已撤",
-	"CANCELLED_ALL":  "全部撤单",
-	"FAILED":         "下单失败",
-	"DISABLED":       "已失效",
-	"DELETED":        "已删除",
+	"WAITING_SUBMIT": "Waiting Submit",
+	"SUBMITTING":     "Submitting",
+	"SUBMITTED":      "Submitted",
+	"FILLED_PART":    "Partially Filled",
+	"FILLED_ALL":     "Filled",
+	"CANCELLED_PART": "Partially Filled Then Cancelled",
+	"CANCELLED_ALL":  "Cancelled",
+	"FAILED":         "Failed",
+	"DISABLED":       "Disabled",
+	"DELETED":        "Deleted",
 }
 
 // orderFlags holds shared flag values for order subcommands.
@@ -140,14 +140,14 @@ var orderFlags struct {
 
 var orderCmd = &cobra.Command{
 	Use:   "order",
-	Short: "交易订单管理",
-	Long:  "管理交易订单：下单买入/卖出、撤单、查看订单列表。",
+	Short: "Order management",
+	Long:  "Manage trading orders: buy, sell, cancel, and list orders.",
 }
 
 var orderBuyCmd = &cobra.Command{
 	Use:   "buy <symbol> <qty>",
-	Short: "买入下单",
-	Long:  "提交买入订单，支持限价单和市价单。",
+	Short: "Place a buy order",
+	Long:  "Place a buy order, supporting limit and market orders.",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runPlaceOrder(cmd, args, orderSideBuy)
@@ -156,8 +156,8 @@ var orderBuyCmd = &cobra.Command{
 
 var orderSellCmd = &cobra.Command{
 	Use:   "sell <symbol> <qty>",
-	Short: "卖出下单",
-	Long:  "提交卖出订单，支持限价单和市价单。",
+	Short: "Place a sell order",
+	Long:  "Place a sell order, supporting limit and market orders.",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runPlaceOrder(cmd, args, orderSideSell)
@@ -166,56 +166,56 @@ var orderSellCmd = &cobra.Command{
 
 var orderPlaceCmd = &cobra.Command{
 	Use:   "place <qty>",
-	Short: "提交通用证券订单",
-	Long:  "提交支持卖空、买回、条件单和多腿订单的证券订单。普通订单需通过 --symbol 指定标的。",
+	Short: "Place a generic securities order",
+	Long:  "Place a securities order supporting sell-short, buy-back, conditional, and multi-leg orders. Non-multi-leg orders require --symbol.",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runGenericPlaceOrder,
 }
 
 var orderCancelCmd = &cobra.Command{
 	Use:   "cancel <order-id>",
-	Short: "撤销订单",
-	Long:  "撤销指定的挂单。",
+	Short: "Cancel an order",
+	Long:  "Cancel the specified open order.",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runCancelOrder,
 }
 
 var orderModifyCmd = &cobra.Command{
 	Use:   "modify <order-id>",
-	Short: "修改订单",
-	Long:  "修改指定订单的数量、价格或条件单触发价。",
+	Short: "Modify an order",
+	Long:  "Modify the quantity, price, or conditional trigger price of the specified order.",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runModifyOrder,
 }
 
 var orderListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "查看未完成订单",
-	Long:  "获取当前账户的未完成订单列表，包含最近 24 小时内已成交或已撤销的订单。",
+	Short: "List open orders",
+	Long:  "List open orders for the current account, including orders filled or cancelled in the last 24 hours.",
 	Args:  cobra.NoArgs,
 	RunE:  runListOrders,
 }
 
 var orderHistoryCmd = &cobra.Command{
 	Use:   "history",
-	Short: "查看历史订单",
-	Long:  "获取当前账户的历史订单列表，支持按市场、时间范围和标的过滤。",
+	Short: "List historical orders",
+	Long:  "List historical orders for the current account, with filters for market, time range, and symbol.",
 	Args:  cobra.NoArgs,
 	RunE:  runHistoryOrders,
 }
 
 var orderDetailCmd = &cobra.Command{
 	Use:   "detail <order-id> [order-id...]",
-	Short: "查看订单详情",
-	Long:  "批量获取指定订单 ID 的详情，最多一次查询 100 个订单。",
+	Short: "Show order details",
+	Long:  "Get details for the specified order IDs. You can query up to 100 orders at once.",
 	Args:  cobra.RangeArgs(1, maxOrderIDs),
 	RunE:  runOrderDetails,
 }
 
 var orderMaxQtyCmd = &cobra.Command{
 	Use:   "max-qty <symbol>",
-	Short: "查询最大买卖数量",
-	Long:  "查询指定标的的最大现金买入、融资买入、持仓卖出、卖空和回补买入数量。",
+	Short: "Query maximum tradable quantity",
+	Long:  "Query maximum cash buy, margin buy, position sell, sell-short, and buy-back quantities for the specified symbol.",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runMaxOrderQty,
 }
@@ -247,72 +247,72 @@ func registerSellFlags(cmd *cobra.Command) {
 
 func registerGenericPlaceFlags(cmd *cobra.Command) {
 	registerPlaceFlags(cmd)
-	cmd.Flags().StringVar(&orderFlags.symbol, "symbol", "", "标的代码（默认: 空；非多腿订单必填）")
-	cmd.Flags().StringVar(&orderFlags.side, "side", "", "交易方向: BUY, SELL, SELL_SHORT, BUY_BACK（必填；默认: 空）")
+	cmd.Flags().StringVar(&orderFlags.symbol, "symbol", "", "Symbol (default: empty; required for non-multi-leg orders)")
+	cmd.Flags().StringVar(&orderFlags.side, "side", "", "Order side: BUY, SELL, SELL_SHORT, BUY_BACK (required; default: empty)")
 	_ = cmd.MarkFlagRequired("side")
 }
 
 func registerPlaceFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&orderFlags.price, "price", "", "委托价格字符串（默认: 空；市价单不传价格）")
-	cmd.Flags().StringVarP(&orderFlags.typ, "type", "t", defaultOrderType, "订单类型（默认: market）")
-	cmd.Flags().StringVarP(&orderFlags.account, "account", "a", "", "交易账户（默认: 配置 default_account）")
-	cmd.Flags().StringVar(&orderFlags.timeInForce, "time-in-force", defaultTimeInForce, "订单有效期: DAY, GTC（默认: DAY）")
-	cmd.Flags().StringVar(&orderFlags.lotType, "lot-type", "", "港股手数类型: ROUND, ODD（默认: 空，由后端决定）")
-	cmd.Flags().StringVar(&orderFlags.remark, "remark", "", "订单备注，最多 64 字节（默认: 空）")
-	cmd.Flags().StringVar(&orderFlags.session, "session", "", "交易时段: RTH, RTH+Pre/Post-Mkt, OVERNIGHT, ALL_DAY（默认: 空，由后端决定）")
-	cmd.Flags().StringVar(&orderFlags.auxPrice, "aux-price", "", "条件单触发价格字符串（默认: 空，不传）")
-	cmd.Flags().StringVar(&orderFlags.orderClass, "order-class", "", "订单类别: MLEG（默认: 空，普通订单）")
-	cmd.Flags().StringVar(&orderFlags.multiLegInfo, "multi-leg-info", "", "多腿订单 JSON 对象（默认: 空）")
+	cmd.Flags().StringVar(&orderFlags.price, "price", "", "Order price string (default: empty; omit for market orders)")
+	cmd.Flags().StringVarP(&orderFlags.typ, "type", "t", defaultOrderType, "Order type (default: market)")
+	cmd.Flags().StringVarP(&orderFlags.account, "account", "a", "", "Trading account ID (default: config default_account)")
+	cmd.Flags().StringVar(&orderFlags.timeInForce, "time-in-force", defaultTimeInForce, "Time in force: DAY, GTC (default: DAY)")
+	cmd.Flags().StringVar(&orderFlags.lotType, "lot-type", "", "HK stock lot type: ROUND, ODD (default: empty, decided by backend)")
+	cmd.Flags().StringVar(&orderFlags.remark, "remark", "", "Order remark, up to 64 bytes (default: empty)")
+	cmd.Flags().StringVar(&orderFlags.session, "session", "", "Trading session: RTH, RTH+Pre/Post-Mkt, OVERNIGHT, ALL_DAY (default: empty, decided by backend)")
+	cmd.Flags().StringVar(&orderFlags.auxPrice, "aux-price", "", "Conditional trigger price string (default: empty)")
+	cmd.Flags().StringVar(&orderFlags.orderClass, "order-class", "", "Order class: MLEG (default: empty for normal orders)")
+	cmd.Flags().StringVar(&orderFlags.multiLegInfo, "multi-leg-info", "", "Multi-leg order JSON object (default: empty)")
 }
 
 // registerListOrderFlags adds flags for the list orders command.
 func registerListOrderFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&orderFlags.account, "account", "a", "", "交易账户（默认: 配置 default_account）")
-	cmd.Flags().StringVarP(&orderFlags.market, "market", "m", service.DefaultTradingMarket, "交易市场: HK, US, HKCC, SG, JP, AU, MY, KR（默认: HK）")
-	cmd.Flags().IntVar(&orderFlags.pageSize, "page-size", service.DefaultPageSize, "每页数量，范围 10-100（默认: 50）")
+	cmd.Flags().StringVarP(&orderFlags.account, "account", "a", "", "Trading account ID (default: config default_account)")
+	cmd.Flags().StringVarP(&orderFlags.market, "market", "m", service.DefaultTradingMarket, "Trading market: HK, US, HKCC, SG, JP, AU, MY, KR (default: HK)")
+	cmd.Flags().IntVar(&orderFlags.pageSize, "page-size", service.DefaultPageSize, "Page size, range 10-100 (default: 50)")
 }
 
 // registerHistoryOrderFlags adds flags for the history orders command.
 func registerHistoryOrderFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&orderFlags.account, "account", "a", "", "交易账户（默认: 配置 default_account）")
-	cmd.Flags().StringVarP(&orderFlags.market, "market", "m", service.DefaultTradingMarket, "交易市场: HK, US, HKCC, SG, JP, AU, MY, KR（默认: HK）")
-	cmd.Flags().Int64Var(&orderFlags.start, "start", 0, "查询开始时间，微秒时间戳（默认: 不限制）")
-	cmd.Flags().Int64Var(&orderFlags.end, "end", 0, "查询结束时间，微秒时间戳（默认: 不限制）")
-	cmd.Flags().StringVar(&orderFlags.symbol, "symbol", "", "标的代码过滤（默认: 不过滤）")
-	cmd.Flags().IntVar(&orderFlags.pageSize, "page-size", service.DefaultPageSize, "每页数量，范围 10-100（默认: 50）")
+	cmd.Flags().StringVarP(&orderFlags.account, "account", "a", "", "Trading account ID (default: config default_account)")
+	cmd.Flags().StringVarP(&orderFlags.market, "market", "m", service.DefaultTradingMarket, "Trading market: HK, US, HKCC, SG, JP, AU, MY, KR (default: HK)")
+	cmd.Flags().Int64Var(&orderFlags.start, "start", 0, "Start time as a microsecond timestamp (default: no lower bound)")
+	cmd.Flags().Int64Var(&orderFlags.end, "end", 0, "End time as a microsecond timestamp (default: no upper bound)")
+	cmd.Flags().StringVar(&orderFlags.symbol, "symbol", "", "Symbol filter (default: no filter)")
+	cmd.Flags().IntVar(&orderFlags.pageSize, "page-size", service.DefaultPageSize, "Page size, range 10-100 (default: 50)")
 }
 
 // registerDetailOrderFlags adds flags for the detail order command.
 func registerDetailOrderFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&orderFlags.account, "account", "a", "", "交易账户（默认: 配置 default_account）")
-	cmd.Flags().StringVar(&orderFlags.exchange, "exchange", "", "交易所标识（必填，如 US、SEHK）")
+	cmd.Flags().StringVarP(&orderFlags.account, "account", "a", "", "Trading account ID (default: config default_account)")
+	cmd.Flags().StringVar(&orderFlags.exchange, "exchange", "", "Exchange code (required, for example US or SEHK)")
 	_ = cmd.MarkFlagRequired("exchange")
 }
 
 // registerModifyFlags adds flags required by the modify order command.
 func registerModifyFlags(cmd *cobra.Command) {
-	cmd.Flags().Int64Var(&orderFlags.qty, "qty", 0, "新订单数量（必填）")
-	cmd.Flags().StringVar(&orderFlags.price, "price", "", "新委托价格字符串（限价单必填；默认: 不修改）")
-	cmd.Flags().StringVar(&orderFlags.auxPrice, "aux-price", "", "新触发价格字符串（条件单使用；默认: 不修改）")
-	cmd.Flags().StringVar(&orderFlags.exchange, "exchange", "", "交易所标识（必填，如 HK、US）")
-	cmd.Flags().StringVarP(&orderFlags.account, "account", "a", "", "交易账户（默认: 配置 default_account）")
+	cmd.Flags().Int64Var(&orderFlags.qty, "qty", 0, "New order quantity (required)")
+	cmd.Flags().StringVar(&orderFlags.price, "price", "", "New order price string (required for limit orders; default: unchanged)")
+	cmd.Flags().StringVar(&orderFlags.auxPrice, "aux-price", "", "New trigger price string for conditional orders (default: unchanged)")
+	cmd.Flags().StringVar(&orderFlags.exchange, "exchange", "", "Exchange code (required, for example HK or US)")
+	cmd.Flags().StringVarP(&orderFlags.account, "account", "a", "", "Trading account ID (default: config default_account)")
 	_ = cmd.MarkFlagRequired("qty")
 	_ = cmd.MarkFlagRequired("exchange")
 }
 
 // registerCancelFlags adds flags required by the cancel order command.
 func registerCancelFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&orderFlags.exchange, "exchange", "", "交易所标识（必填，如 HK、US）")
-	cmd.Flags().StringVarP(&orderFlags.account, "account", "a", "", "交易账户（默认: 配置 default_account）")
+	cmd.Flags().StringVar(&orderFlags.exchange, "exchange", "", "Exchange code (required, for example HK or US)")
+	cmd.Flags().StringVarP(&orderFlags.account, "account", "a", "", "Trading account ID (default: config default_account)")
 	_ = cmd.MarkFlagRequired("exchange")
 }
 
 // registerMaxQtyFlags adds flags for the max-qty command.
 func registerMaxQtyFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&orderFlags.price, "price", "", "参考价格字符串（非市价单必填；默认: 空）")
-	cmd.Flags().StringVarP(&orderFlags.typ, "type", "t", defaultOrderType, "订单类型: limit, market（默认: market）")
-	cmd.Flags().StringVar(&orderFlags.orderID, "order-id", "", "改单时的原订单 ID（默认: 空）")
-	cmd.Flags().StringVarP(&orderFlags.account, "account", "a", "", "交易账户（默认: 配置 default_account）")
+	cmd.Flags().StringVar(&orderFlags.price, "price", "", "Reference price string (required for non-market orders; default: empty)")
+	cmd.Flags().StringVarP(&orderFlags.typ, "type", "t", defaultOrderType, "Order type: limit, market (default: market)")
+	cmd.Flags().StringVar(&orderFlags.orderID, "order-id", "", "Original order ID for order modification scenarios (default: empty)")
+	cmd.Flags().StringVarP(&orderFlags.account, "account", "a", "", "Trading account ID (default: config default_account)")
 }
 
 // runPlaceOrder is the shared handler for buy and sell subcommands.

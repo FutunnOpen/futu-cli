@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/FutunnOpen/futu-cli/internal/client"
+	"github.com/futunn/futu/internal/client"
 )
 
 // Endpoint names for trade API routes.

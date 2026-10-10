@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/FutunnOpen/futu-cli/internal/client"
+	"github.com/futunn/futu/internal/client"
 )
 
 const (

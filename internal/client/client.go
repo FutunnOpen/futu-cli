@@ -14,8 +14,8 @@ import (
 
 	"golang.org/x/time/rate"
 
-	apierr "github.com/FutunnOpen/futu-cli/internal/errors"
-	"github.com/FutunnOpen/futu-cli/internal/reporting"
+	apierr "github.com/futunn/futu/internal/errors"
+	"github.com/futunn/futu/internal/reporting"
 )
 
 // ── Constants ────────────────────────────────────────────────────────────────

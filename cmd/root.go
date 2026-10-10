@@ -10,14 +10,14 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/FutunnOpen/futu-cli/internal/analytics"
-	"github.com/FutunnOpen/futu-cli/internal/auth"
-	"github.com/FutunnOpen/futu-cli/internal/client"
-	"github.com/FutunnOpen/futu-cli/internal/config"
-	"github.com/FutunnOpen/futu-cli/internal/output"
-	"github.com/FutunnOpen/futu-cli/internal/reporting"
-	"github.com/FutunnOpen/futu-cli/internal/service"
-	"github.com/FutunnOpen/futu-cli/internal/update"
+	"github.com/futunn/futu/internal/analytics"
+	"github.com/futunn/futu/internal/auth"
+	"github.com/futunn/futu/internal/client"
+	"github.com/futunn/futu/internal/config"
+	"github.com/futunn/futu/internal/output"
+	"github.com/futunn/futu/internal/reporting"
+	"github.com/futunn/futu/internal/service"
+	"github.com/futunn/futu/internal/update"
 )
 
 // Version is set at build time via -ldflags.
@@ -74,7 +74,6 @@ var (
 	quoteSvc         *service.QuoteService
 	tradeSvc         *service.TradeService
 	cryptoSvc        *service.CryptoService
-	web3Svc          *service.Web3Service
 	reporter         *analytics.Reporter
 	requestReporter  *reporting.Reporter
 	cmdStartTime     time.Time
@@ -115,10 +114,14 @@ var noConfigCommands = map[string]bool{
 	"help":       true,
 }
 
+const quoteGroupID = "quote"
+const simGroupID = "sim"
+const newsGroupID = "news"
+
 var rootCmd = &cobra.Command{
 	Use:   "futu",
-	Short: "Futu CLI — 富途命令行工具",
-	Long:  "Futu CLI V1: REST API 行情、交易、Web3，开箱即用。",
+	Short: "Futu CLI",
+	Long:  "Futu CLI V1: REST API market data and trading workflows.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		cmdStartTime = time.Now()
 		return initSharedState(cmd)
@@ -142,11 +145,13 @@ func Execute() error {
 }
 
 func init() {
+	rootCmd.AddGroup(&cobra.Group{ID: quoteGroupID, Title: "Quote Commands:"})
+	rootCmd.AddGroup(&cobra.Group{ID: simGroupID, Title: "Sim Trade Commands:"})
+	rootCmd.AddGroup(&cobra.Group{ID: newsGroupID, Title: "News Commands:"})
 	rootCmd.PersistentFlags().StringVarP(&outputFormat, "format", "f", formatTable,
-		"输出格式: table, json（默认: table）")
+		"Output format: table or json (default: table)")
 	rootCmd.PersistentFlags().StringVar(&tokenFile, "token-file", "",
-		"OAuth token 加密文件路径")
-	_ = rootCmd.PersistentFlags().MarkHidden("token-file")
+		"OAuth token file path (default: config token_file)")
 }
 
 // initSharedState loads config, ensures auth (when needed), and initializes
@@ -200,7 +205,7 @@ func initAuthenticatedClient() error {
 // initOAuthClient sets up the client using OAuth token authentication.
 func initOAuthClient() error {
 	if len(cfg.ClientID) == 0 {
-		return fmt.Errorf("client_id 未配置\n请运行 'futu config init' 完成 OAuth 客户端注册")
+		return fmt.Errorf("client_id is not configured\nRun 'futu config init' to register the OAuth client")
 	}
 
 	token, err := auth.EnsureValid(cfg.ClientID, effectiveTokenFile())
@@ -227,7 +232,7 @@ func initOAuthClient() error {
 func newRequestReporter(token string) *reporting.Reporter {
 	requestReporter = reporting.NewReporter(reporting.Options{
 		Enabled: cfg.Telemetry,
-		Host:    cfg.ReportHost,
+		Host:    "",
 		Token:   token,
 	})
 	return requestReporter
@@ -388,7 +393,6 @@ func initServices() {
 	quoteSvc = service.NewQuoteService(httpClient)
 	tradeSvc = service.NewTradeService(httpClient)
 	cryptoSvc = service.NewCryptoService(httpClient)
-	web3Svc = service.NewWeb3Service(httpClient)
 }
 
 // reportAndCheckUpdate sends analytics and prints an update notice if available.

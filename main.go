@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/FutunnOpen/futu-cli/cmd"
+	"github.com/futunn/futu/cmd"
 )
 
 func main() {

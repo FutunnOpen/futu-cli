@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	DefaultHost = "report.futunn.com"
+	// DefaultHost is intentionally set to the UAT reporting endpoint during the current test phase.
+	DefaultHost = "test-report.futunn.com"
 
 	DefaultQueueSize    = 256
 	DefaultRequestLimit = 2 * time.Second

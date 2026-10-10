@@ -9,8 +9,8 @@ import (
 func TestTableWriterAlignsWideCharacters(t *testing.T) {
 	var output bytes.Buffer
 	table := NewTableWriter(&output, "Side", "Type", "Status")
-	table.AddRow("BUY(买入)", "LIMIT(限价单)", "FILLED_ALL(全部成交)")
-	table.AddRow("SELL_SHORT(卖空)", "MARKET(市价单)", "FAILED(下单失败)")
+	table.AddRow("BUY(Buy)", "LIMIT(Limit)", "FILLED_ALL(Filled)")
+	table.AddRow("SELL_SHORT(Sell Short)", "MARKET(Market)", "FAILED(Failed)")
 
 	table.Render()
 
@@ -27,7 +27,7 @@ func TestTableWriterAlignsWideCharacters(t *testing.T) {
 }
 
 func TestDisplayWidthCountsWideCharacters(t *testing.T) {
-	if got, want := displayWidth("BUY(买入)"), 9; got != want {
+	if got, want := displayWidth("BUY(Buy)"), 8; got != want {
 		t.Fatalf("displayWidth() = %d, want %d", got, want)
 	}
 }

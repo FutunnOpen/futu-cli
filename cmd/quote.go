@@ -6,9 +6,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/FutunnOpen/futu-cli/internal/output"
-	"github.com/FutunnOpen/futu-cli/internal/service"
-	"github.com/FutunnOpen/futu-cli/pkg/symbol"
+	"github.com/futunn/futu/internal/output"
+	"github.com/futunn/futu/internal/service"
+	"github.com/futunn/futu/pkg/symbol"
 )
 
 // Table header labels for the quote command.
@@ -25,16 +25,20 @@ const (
 )
 
 var quoteCmd = &cobra.Command{
-	Use:   "quote <symbol...>",
-	Short: "获取实时报价快照",
-	Long: `获取一个或多个标的的实时报价，包含最新价、涨跌额、涨跌幅、成交量等。
+	Use:     "quote <symbol...>",
+	GroupID: quoteGroupID,
+	Short:   "Get real-time quotes",
+	Long: `Get real-time quotes for one or more symbols. For US stocks, pre-market, post-market, or overnight sessions are printed as additional rows when available.
 
-支持的代码格式:
-  HK.09988     富途格式（市场.代码）
-  9988         纯数字默认港股
-  700.HK       代码.市场
-  AAPL         纯字母默认美股
-  US.AAPL      富途格式美股`,
+Supported symbol formats:
+  HK.00700     market.code
+  700.HK       code.market
+  700          numeric symbols default to HK
+  US.AAPL      market.code
+  AAPL         alphabetic symbols default to US`,
+	Example: `  futu quote HK.00700
+  futu quote US.AAPL
+  futu quote US.AAPL --format json`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: runQuote,
 }
@@ -79,6 +83,7 @@ func renderQuoteTable(quotes []service.StockQuote) {
 	tw := output.NewTableWriter(os.Stdout,
 		quoteHeaderCode,
 		quoteHeaderName,
+		"Session",
 		quoteHeaderLast,
 		quoteHeaderChange,
 		quoteHeaderChangePct,
@@ -98,6 +103,7 @@ func renderQuoteTable(quotes []service.StockQuote) {
 		tw.AddRow(
 			q.Code,
 			q.SCName,
+			"REGULAR",
 			fmt.Sprintf("%.3f", q.LastPrice),
 			formatChange(change),
 			formatChangePct(changePct),
@@ -106,8 +112,34 @@ func renderQuoteTable(quotes []service.StockQuote) {
 			fmt.Sprintf("%d", q.Volume),
 			formatTurnover(q.Turnover),
 		)
+		addQuoteSessionRow(tw, q, "PREMARKET", q.PreMarket)
+		addQuoteSessionRow(tw, q, "AFTERHOURS", q.AfterMarket)
+		addQuoteSessionRow(tw, q, "OVERNIGHT", q.Overnight)
 	}
 	tw.Render()
+}
+
+func addQuoteSessionRow(tw *output.TableWriter, q service.StockQuote, session string, data *service.MarketSession) {
+	if data == nil || !hasQuoteSessionData(data) {
+		return
+	}
+	tw.AddRow(
+		q.Code,
+		q.SCName,
+		session,
+		fmt.Sprintf("%.3f", data.Price),
+		formatChange(data.ChangeVal),
+		formatChangePct(data.ChangeRate),
+		fmt.Sprintf("%.3f", data.HighPrice),
+		fmt.Sprintf("%.3f", data.LowPrice),
+		fmt.Sprintf("%d", data.Volume),
+		formatTurnover(data.Turnover),
+	)
+}
+
+func hasQuoteSessionData(data *service.MarketSession) bool {
+	return data.Price != 0 || data.Volume != 0 || data.Turnover != 0 ||
+		data.HighPrice != 0 || data.LowPrice != 0
 }
 
 func formatChange(v float64) string {
@@ -126,14 +158,14 @@ func formatChangePct(v float64) string {
 
 func formatTurnover(v float64) string {
 	const (
-		billion = 1e8
-		tenK    = 1e4
+		million  = 1e6
+		thousand = 1e3
 	)
 	switch {
-	case v >= billion:
-		return fmt.Sprintf("%.2f亿", v/billion)
-	case v >= tenK:
-		return fmt.Sprintf("%.2f万", v/tenK)
+	case v >= million:
+		return fmt.Sprintf("%.2fM", v/million)
+	case v >= thousand:
+		return fmt.Sprintf("%.2fK", v/thousand)
 	default:
 		return fmt.Sprintf("%.0f", v)
 	}

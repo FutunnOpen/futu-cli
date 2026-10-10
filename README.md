@@ -29,7 +29,7 @@ npm:
 npm install -g github:FutunnOpen/futu-cli
 ```
 
-After the package is published to the npm registry, this will also be available (WIP — not published yet):
+After the package is published to the npm registry, this will also be available:
 
 ```bash
 npm install -g @futunn/futu-cli
@@ -76,7 +76,7 @@ If installed from GitHub through npm, reinstall from GitHub:
 npm install -g github:FutunnOpen/futu-cli
 ```
 
-After the package is published to the npm registry, use (WIP — not published yet):
+After the package is published to the npm registry, use:
 
 ```bash
 npm update -g @futunn/futu-cli

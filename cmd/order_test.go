@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FutunnOpen/futu-cli/internal/service"
+	"github.com/futunn/futu/internal/service"
 )
 
 func TestSingleOrderColumnsOmitsEmptyValues(t *testing.T) {
@@ -20,7 +20,7 @@ func TestSingleOrderColumnsOmitsEmptyValues(t *testing.T) {
 	headers, row := singleOrderColumns(order)
 
 	wantHeaders := []string{orderHeaderID, orderHeaderType, orderHeaderPrice, orderHeaderQty}
-	wantRow := []string{"FH1D27CBC2D97F2000", "MODIFIED(已改单)", "301.000", "1"}
+	wantRow := []string{"FH1D27CBC2D97F2000", "MODIFIED(Modified)", "301.000", "1"}
 	if !reflect.DeepEqual(headers, wantHeaders) {
 		t.Fatalf("headers = %#v, want %#v", headers, wantHeaders)
 	}
@@ -42,7 +42,7 @@ func TestSingleOrderColumnsKeepsKnownOrderFields(t *testing.T) {
 	headers, row := singleOrderColumns(order)
 
 	wantHeaders := []string{orderHeaderID, orderHeaderSymbol, orderHeaderSide, orderHeaderType, orderHeaderPrice, orderHeaderQty}
-	wantRow := []string{"FH1D27CBC2D97F2000", "US.AAPL", "BUY(买入)", "LIMIT(限价单)", "300.000", "1"}
+	wantRow := []string{"FH1D27CBC2D97F2000", "US.AAPL", "BUY(Buy)", "LIMIT(Limit)", "300.000", "1"}
 	if !reflect.DeepEqual(headers, wantHeaders) {
 		t.Fatalf("headers = %#v, want %#v", headers, wantHeaders)
 	}

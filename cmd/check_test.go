@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/FutunnOpen/futu-cli/internal/auth"
+	"github.com/futunn/futu/internal/auth"
 )
 
 func TestProbeEndpointAcceptsAnyHTTPResponse(t *testing.T) {

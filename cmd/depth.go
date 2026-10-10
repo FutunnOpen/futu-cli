@@ -6,77 +6,96 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/FutunnOpen/futu-cli/internal/output"
-	"github.com/FutunnOpen/futu-cli/internal/service"
-	"github.com/FutunnOpen/futu-cli/pkg/symbol"
+	"github.com/futunn/futu/internal/output"
+	"github.com/futunn/futu/pkg/symbol"
 )
 
-// Table header labels for the depth command.
-const (
-	depthHeaderAskPrice = "AskPrice"
-	depthHeaderAskVol   = "AskVol"
-	depthHeaderBidPrice = "BidPrice"
-	depthHeaderBidVol   = "BidVol"
-)
-
-// Placeholder for missing depth levels when asks and bids differ in length.
 const depthEmptyPlaceholder = "-"
 
+var orderBookFlags struct {
+	num int
+}
+
+var orderBookCmd = &cobra.Command{
+	Use:     "order-book <symbol>",
+	GroupID: quoteGroupID,
+	Short:   "Get order book",
+	Long:    "Get the real-time order book for the specified symbol. Market-data permissions determine depth; --num only caps the returned levels.",
+	Example: `  futu order-book HK.00700
+  futu order-book US.AAPL --num 10 --format json`,
+	Args: cobra.ExactArgs(1),
+	RunE: runOrderBook,
+}
+
 var depthCmd = &cobra.Command{
-	Use:   "depth <symbol>",
-	Short: "获取买卖盘深度",
-	Long:  "获取指定标的的买卖盘（order book）深度数据，逐档展示卖盘和买盘。",
-	Args:  cobra.ExactArgs(1),
-	RunE:  runDepth,
+	Use:     "depth <symbol>",
+	GroupID: quoteGroupID,
+	Short:   "Get order book (alias of order-book)",
+	Long:    "Alias of order-book.",
+	Args:    cobra.ExactArgs(1),
+	RunE:    runOrderBook,
 }
 
 func init() {
-	rootCmd.AddCommand(depthCmd)
+	orderBookCmd.Flags().IntVarP(&orderBookFlags.num, "num", "n", 0,
+		"Maximum order-book depth (default: 0, return the maximum allowed by market-data permissions; range 1-60)")
+	depthCmd.Flags().IntVarP(&orderBookFlags.num, "num", "n", 0,
+		"Maximum order-book depth (default: 0, return the maximum allowed by market-data permissions; range 1-60)")
+	rootCmd.AddCommand(orderBookCmd, depthCmd)
 }
 
-// runDepth is the top-level handler for the depth command.
-func runDepth(cmd *cobra.Command, args []string) error {
+func runOrderBook(cmd *cobra.Command, args []string) error {
 	sym, err := symbol.Parse(args[0])
 	if err != nil {
 		return fmt.Errorf("parsing symbol: %w", err)
 	}
-
-	ctx := cmdContext(cmd)
-	depth, err := quoteSvc.GetDepth(ctx, sym.Full)
+	result, err := quoteSvc.GetOrderBook(
+		cmdContext(cmd),
+		sym.FutuCode(),
+		orderBookFlags.num,
+		cmd.Flags().Changed("num"),
+	)
 	if err != nil {
-		return fmt.Errorf("fetching depth: %w", err)
+		return err
 	}
-
-	printResult(depth, func() {
-		renderDepthTable(depth)
+	printBFFResult(result, func() {
+		renderOrderBookTable(decodeJSONValue(result.Data))
 	})
 	return nil
 }
 
-// renderDepthTable writes order book data as a formatted table to stdout,
-// aligning asks and bids side-by-side.
-func renderDepthTable(depth *service.Depth) {
-	tw := output.NewTableWriter(os.Stdout,
-		depthHeaderAskPrice,
-		depthHeaderAskVol,
-		depthHeaderBidPrice,
-		depthHeaderBidVol,
-	)
-
-	rowCount := max(len(depth.Asks), len(depth.Bids))
-	for i := 0; i < rowCount; i++ {
-		askPrice, askVol := formatDepthEntry(depth.Asks, i)
-		bidPrice, bidVol := formatDepthEntry(depth.Bids, i)
-		tw.AddRow(askPrice, askVol, bidPrice, bidVol)
+func renderOrderBookTable(data any) {
+	items := anyListToObjects(asAnyList(data))
+	if len(items) == 0 {
+		return
+	}
+	books := anyListToObjects(asAnyList(items[0]["books"]))
+	if len(books) == 0 {
+		return
+	}
+	tw := output.NewTableWriter(os.Stdout, "Exchange", "AskPrice", "AskVol", "BidPrice", "BidVol")
+	for _, book := range books {
+		bids := anyListToObjects(asAnyList(book["bid_list"]))
+		asks := anyListToObjects(asAnyList(book["ask_list"]))
+		exchange := jsonString(book, "exchange")
+		rowCount := max(len(asks), len(bids))
+		for i := 0; i < rowCount; i++ {
+			askPrice, askVol := formatBookLevel(asks, i)
+			bidPrice, bidVol := formatBookLevel(bids, i)
+			tw.AddRow(exchange, askPrice, askVol, bidPrice, bidVol)
+		}
 	}
 	tw.Render()
 }
 
-// formatDepthEntry returns formatted price and volume strings for the entry
-// at index i, or placeholder strings if the index is out of range.
-func formatDepthEntry(entries []service.DepthEntry, i int) (string, string) {
-	if i >= len(entries) {
+func asAnyList(value any) []any {
+	list, _ := value.([]any)
+	return list
+}
+
+func formatBookLevel(levels []map[string]any, i int) (string, string) {
+	if i >= len(levels) {
 		return depthEmptyPlaceholder, depthEmptyPlaceholder
 	}
-	return fmt.Sprintf("%.3f", entries[i].Price), fmt.Sprintf("%d", entries[i].Volume)
+	return formatPrice(jsonFloat(levels[i], "price")), fmt.Sprintf("%d", jsonInt(levels[i], "volume"))
 }

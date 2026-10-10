@@ -1,4 +1,4 @@
-module github.com/FutunnOpen/futu-cli
+module github.com/futunn/futu
 
 go 1.22
 

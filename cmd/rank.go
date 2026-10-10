@@ -6,14 +6,15 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/FutunnOpen/futu-cli/internal/output"
-	"github.com/FutunnOpen/futu-cli/internal/service"
+	"github.com/futunn/futu/internal/output"
+	"github.com/futunn/futu/internal/service"
 )
 
 // Rank command defaults.
 const (
 	defaultRankMarket = "HK"
 	defaultRankCount  = 20
+	defaultRankType   = "volume"
 )
 
 // Rank table headers.
@@ -37,24 +38,28 @@ var rankFlags struct {
 }
 
 var rankCmd = &cobra.Command{
-	Use:   "rank <type>",
-	Short: "查看市场排行榜",
-	Long:  "查看市场排行榜，支持类型: volume, turnover, gainers, losers, amplitude。",
-	Args:  cobra.ExactArgs(1),
-	RunE:  runRank,
+	Use:     "rank [type]",
+	GroupID: quoteGroupID,
+	Short:   "Show market rankings",
+	Long:    "Show market rankings. type: volume, turnover, gainers, losers, amplitude. Defaults to the top 20 HK stocks by volume.",
+	Args:    cobra.MaximumNArgs(1),
+	RunE:    runRank,
 }
 
 func init() {
 	rankCmd.Flags().StringVarP(&rankFlags.market, "market", "m", defaultRankMarket,
-		"市场: HK, US, CN")
+		"Market (default: HK). HK / US / CN")
 	rankCmd.Flags().IntVarP(&rankFlags.count, "count", "c", defaultRankCount,
-		"返回数量")
+		"Number of rows to return (default: 20)")
 	rootCmd.AddCommand(rankCmd)
 }
 
 // runRank validates the rank type, fetches the ranking list, and renders the output.
 func runRank(cmd *cobra.Command, args []string) error {
-	rankType := args[0]
+	rankType := defaultRankType
+	if len(args) > 0 {
+		rankType = args[0]
+	}
 	if err := validateRankType(rankType); err != nil {
 		return err
 	}

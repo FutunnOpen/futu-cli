@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FutunnOpen/futu-cli/internal/client"
+	"github.com/futunn/futu/internal/client"
 )
 
 func TestGetCryptoTotalBalanceUsesAccountPath(t *testing.T) {

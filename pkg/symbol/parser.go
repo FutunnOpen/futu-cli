@@ -13,18 +13,37 @@ const (
 	MarketSH     = "SH"
 	MarketSZ     = "SZ"
 	MarketBJ     = "BJ"
+	MarketSG     = "SG"
+	MarketJP     = "JP"
+	MarketMY     = "MY"
+	MarketAU     = "AU"
+	MarketCA     = "CA"
+	MarketKR     = "KR"
+	MarketCN     = "CN"
+	MarketCC     = "CC"
+	MarketHKCC   = "HKCC"
 	MarketBMD    = "BMD"
+	MarketBMS    = "BMS"
 	MarketCrypto = "CRYPTO"
 )
 
-// knownMarkets contains market prefixes recognised by the Futu API.
 var knownMarkets = map[string]bool{
-	MarketHK:  true,
-	MarketUS:  true,
-	MarketSH:  true,
-	MarketSZ:  true,
-	MarketBJ:  true,
-	MarketBMD: true,
+	MarketHK:   true,
+	MarketUS:   true,
+	MarketSH:   true,
+	MarketSZ:   true,
+	MarketBJ:   true,
+	MarketSG:   true,
+	MarketJP:   true,
+	MarketMY:   true,
+	MarketAU:   true,
+	MarketCA:   true,
+	MarketKR:   true,
+	MarketCN:   true,
+	MarketCC:   true,
+	MarketHKCC: true,
+	MarketBMD:  true,
+	MarketBMS:  true,
 }
 
 // HK stock code width for zero-padding.
@@ -93,12 +112,8 @@ func buildCrypto(input string) *Symbol {
 	return buildSymbol(code, MarketCrypto)
 }
 
-// splitSymbol splits a dotted symbol into (code, market).
-// Supports both "CODE.MARKET" (e.g. "700.HK") and Futu-format
-// "MARKET.CODE" (e.g. "HK.09988") by checking whether the left
-// side is a known market prefix.
 func splitSymbol(input string) (string, string) {
-	idx := strings.LastIndex(input, ".")
+	idx := strings.Index(input, ".")
 	if idx < 0 {
 		return input, ""
 	}
@@ -106,7 +121,8 @@ func splitSymbol(input string) (string, string) {
 	if knownMarkets[strings.ToUpper(left)] {
 		return right, left
 	}
-	return left, right
+	last := strings.LastIndex(input, ".")
+	return input[:last], input[last+1:]
 }
 
 // inferMarket determines the default market based on the code format.
@@ -131,13 +147,26 @@ func isAllDigits(s string) bool {
 	return true
 }
 
-// normalizeCode applies market-specific normalization.
-// HK stock codes are zero-padded to 5 digits.
 func normalizeCode(code, market string) string {
 	if market == MarketHK && isAllDigits(code) {
 		return padLeft(code, '0', hkCodeWidth)
 	}
-	return strings.ToUpper(code)
+	if isAllLetters(code) && strings.ToLower(code) == code {
+		return strings.ToUpper(code)
+	}
+	return code
+}
+
+func isAllLetters(s string) bool {
+	if len(s) == 0 {
+		return false
+	}
+	for _, r := range s {
+		if !unicode.IsLetter(r) {
+			return false
+		}
+	}
+	return true
 }
 
 // padLeft pads s with the given character on the left until it reaches width.

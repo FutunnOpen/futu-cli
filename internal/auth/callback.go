@@ -22,12 +22,12 @@ const callbackPortRetries = 3
 
 const callbackSuccessHTML = `<!DOCTYPE html>
 <html><body style="font-family:sans-serif;text-align:center;padding:60px">
-<h2>授权成功</h2><p>请关闭此页面，返回终端继续操作。</p>
+<h2>Authorization successful</h2><p>You can close this page and return to the terminal.</p>
 </body></html>`
 
 const callbackErrorHTML = `<!DOCTYPE html>
 <html><body style="font-family:sans-serif;text-align:center;padding:60px">
-<h2>授权失败</h2><p>%s</p>
+<h2>Authorization failed</h2><p>%s</p>
 </body></html>`
 
 type authorizationTimeoutError struct {

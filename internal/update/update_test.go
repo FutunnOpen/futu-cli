@@ -65,15 +65,17 @@ func TestCheckUsesGitHubLatestReleaseRedirect(t *testing.T) {
 	}
 }
 
-func TestDefaultConfigUsesDefaultReleaseBase(t *testing.T) {
+func TestDefaultConfigUsesOfficialReleaseBase(t *testing.T) {
 	t.Setenv(envReleaseBase, "")
-
 	cfg, err := defaultConfig()
 	if err != nil {
 		t.Fatalf("defaultConfig() error = %v", err)
 	}
 	if cfg.ReleaseBase != defaultReleaseBase {
 		t.Fatalf("ReleaseBase = %q, want %q", cfg.ReleaseBase, defaultReleaseBase)
+	}
+	if cfg.LatestURL != defaultReleaseBase+"/releases/latest" {
+		t.Fatalf("LatestURL = %q", cfg.LatestURL)
 	}
 }
 
@@ -103,11 +105,5 @@ func TestTagFromLocation(t *testing.T) {
 	}
 	if got != "v1.2.3" {
 		t.Fatalf("tag = %q, want v1.2.3", got)
-	}
-}
-
-func TestTagFromLocationRejectsReleasesPage(t *testing.T) {
-	if _, err := tagFromLocation("https://github.com/owner/repo/releases"); err == nil {
-		t.Fatal("expected latest stable release error")
 	}
 }

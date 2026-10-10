@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/FutunnOpen/futu-cli/internal/output"
-	"github.com/FutunnOpen/futu-cli/internal/service"
+	"github.com/futunn/futu/internal/output"
+	"github.com/futunn/futu/internal/service"
 )
 
 // Table header labels for the account list subcommand.
@@ -105,27 +105,27 @@ const (
 
 var accountCmd = &cobra.Command{
 	Use:   "account",
-	Short: "账户管理",
-	Long:  "查询交易账户列表和账户资金信息。",
+	Short: "Account management",
+	Long:  "List trading accounts and query account funds.",
 }
 
 var accountListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "查询账户列表",
-	Long:  "查询当前用户可访问的所有交易账户。",
+	Short: "List accounts",
+	Long:  "List all trading accounts available to the current user.",
 	RunE:  runAccountList,
 }
 
 var accountFundsCmd = &cobra.Command{
 	Use:   "funds",
-	Short: "查询账户资金",
-	Long:  "查询指定账户的资金概览，包含现金、总资产、市值和可用资金。",
+	Short: "Query account funds",
+	Long:  "Query a fund overview for the specified account, including cash, total assets, market value, and available funds.",
 	RunE:  runAccountFunds,
 }
 
 func init() {
-	accountFundsCmd.Flags().StringP("account", "a", "", "交易账户 ID")
-	accountFundsCmd.Flags().StringP("currency", "c", defaultFundsCurrency, "资金展示币种")
+	accountFundsCmd.Flags().StringP("account", "a", "", "Trading account ID")
+	accountFundsCmd.Flags().StringP("currency", "c", defaultFundsCurrency, "Display currency")
 	accountCmd.AddCommand(accountListCmd)
 	accountCmd.AddCommand(accountFundsCmd)
 	rootCmd.AddCommand(accountCmd)

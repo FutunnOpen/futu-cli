@@ -6,8 +6,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/FutunnOpen/futu-cli/internal/output"
-	"github.com/FutunnOpen/futu-cli/internal/service"
+	"github.com/futunn/futu/internal/output"
+	"github.com/futunn/futu/internal/service"
 )
 
 // Table header labels for the position command.
@@ -34,16 +34,16 @@ var positionSideNames = map[string]string{
 
 var positionCmd = &cobra.Command{
 	Use:   "position",
-	Short: "查询持仓列表",
-	Long:  "查询指定账户的持仓列表，包含持仓数量、成本价、市值和盈亏信息。",
+	Short: "List positions",
+	Long:  "List positions for the specified account, including quantity, cost price, market value, and P/L.",
 	RunE:  runPosition,
 }
 
 func init() {
-	positionCmd.Flags().StringP("account", "a", "", "交易账户 ID")
-	positionCmd.Flags().String("symbol", "", "按标的代码过滤 (如: US.AAPL)")
-	positionCmd.Flags().String("pl-ratio-min", "", "盈亏比例下限过滤，如 -0.1 表示 ≥ -10%")
-	positionCmd.Flags().String("pl-ratio-max", "", "盈亏比例上限过滤，如 0.2 表示 ≤ +20%")
+	positionCmd.Flags().StringP("account", "a", "", "Trading account ID")
+	positionCmd.Flags().String("symbol", "", "Filter by symbol, for example US.AAPL")
+	positionCmd.Flags().String("pl-ratio-min", "", "Minimum P/L ratio, for example -0.1 means >= -10%")
+	positionCmd.Flags().String("pl-ratio-max", "", "Maximum P/L ratio, for example 0.2 means <= +20%")
 	rootCmd.AddCommand(positionCmd)
 }
 

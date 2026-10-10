@@ -13,7 +13,6 @@ const (
 	DefaultAPIBase    = "https://webapi.futunn.com"
 	DefaultTelemetry  = true
 	DefaultAutoUpdate = true
-	DefaultReportHost = "report.futunn.com"
 
 	configDirName  = ".futu"
 	configFileName = "config.json"
@@ -32,7 +31,6 @@ const (
 	KeyDefaultAcct = "default_account"
 	KeyTelemetry   = "telemetry"
 	KeyAutoUpdate  = "auto_update"
-	KeyReportHost  = "report_host"
 )
 
 // Config holds the CLI configuration.
@@ -44,7 +42,6 @@ type Config struct {
 	DefaultAcct string `json:"default_account"`
 	Telemetry   bool   `json:"telemetry"`
 	AutoUpdate  bool   `json:"auto_update"`
-	ReportHost  string `json:"report_host"`
 }
 
 // DefaultConfig returns a Config populated with sensible defaults.
@@ -54,7 +51,6 @@ func DefaultConfig() *Config {
 		TokenFile:  filepath.Join(ConfigDir(), tokenFileName),
 		Telemetry:  DefaultTelemetry,
 		AutoUpdate: DefaultAutoUpdate,
-		ReportHost: DefaultReportHost,
 	}
 }
 
@@ -155,8 +151,6 @@ func (c *Config) Get(key string) string {
 		return strconv.FormatBool(c.Telemetry)
 	case KeyAutoUpdate:
 		return strconv.FormatBool(c.AutoUpdate)
-	case KeyReportHost:
-		return c.ReportHost
 	default:
 		return ""
 	}
@@ -182,8 +176,6 @@ func (c *Config) Set(key, value string) error {
 		return c.setBool(&c.Telemetry, key, value)
 	case KeyAutoUpdate:
 		return c.setBool(&c.AutoUpdate, key, value)
-	case KeyReportHost:
-		c.ReportHost = value
 	default:
 		return fmt.Errorf("unknown config key: %s", key)
 	}

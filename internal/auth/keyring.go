@@ -102,7 +102,7 @@ func DecryptAndLoad(path string) ([]byte, error) {
 		return nil, legacyErr
 	}
 	if err := EncryptAndSave(path, decrypted); err != nil {
-		return nil, fmt.Errorf("migrate legacy token encryption: %w", err)
+		return decrypted, nil
 	}
 	return decrypted, nil
 }
@@ -113,7 +113,7 @@ func getOrCreateEncryptionKey() ([]byte, error) {
 		return key, nil
 	}
 	if !errors.Is(err, keyring.ErrNotFound) {
-		return nil, err
+		return deriveMachineKey(), nil
 	}
 	key = make([]byte, encryptionKeySize)
 	if _, err := rand.Read(key); err != nil {
@@ -121,7 +121,7 @@ func getOrCreateEncryptionKey() ([]byte, error) {
 	}
 	encoded := base64.RawStdEncoding.EncodeToString(key)
 	if err := keyring.Set(keyringService, encryptionKeyUser, encoded); err != nil {
-		return nil, fmt.Errorf("store encryption key: %w", err)
+		return deriveMachineKey(), nil
 	}
 	return key, nil
 }

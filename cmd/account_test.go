@@ -3,7 +3,7 @@ package cmd
 import (
 	"testing"
 
-	"github.com/FutunnOpen/futu-cli/internal/service"
+	"github.com/futunn/futu/internal/service"
 )
 
 func TestFormatSecurityFirm(t *testing.T) {

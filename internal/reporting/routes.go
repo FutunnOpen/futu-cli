@@ -77,7 +77,6 @@ func ShouldCoarseRedact(toolID, path string) bool {
 		}
 	}
 	return strings.Contains(path, "/crypto/") ||
-		strings.Contains(path, "/web3/") ||
 		isAccountSensitivePath(path)
 }
 

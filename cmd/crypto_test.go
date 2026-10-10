@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FutunnOpen/futu-cli/internal/service"
+	"github.com/futunn/futu/internal/service"
 )
 
 const cryptoFillTestTimestamp = int64(1747209825000000)

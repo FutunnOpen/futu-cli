@@ -13,12 +13,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/FutunnOpen/futu-cli/internal/auth"
-	"github.com/FutunnOpen/futu-cli/internal/client"
-	"github.com/FutunnOpen/futu-cli/internal/config"
-	apierr "github.com/FutunnOpen/futu-cli/internal/errors"
-	"github.com/FutunnOpen/futu-cli/internal/output"
-	"github.com/FutunnOpen/futu-cli/internal/service"
+	"github.com/futunn/futu/internal/auth"
+	"github.com/futunn/futu/internal/client"
+	"github.com/futunn/futu/internal/config"
+	apierr "github.com/futunn/futu/internal/errors"
+	"github.com/futunn/futu/internal/output"
+	"github.com/futunn/futu/internal/service"
 )
 
 const (
@@ -41,35 +41,35 @@ const (
 	labelActivePkgs   = "Activated Packages"
 	labelInactivePkgs = "Unactivated Packages"
 	labelQuotePerms   = "Quote Permissions"
-	messageUsingToken = "已登录，继续使用现有 Token。"
-	messageRefreshed  = "Token 已刷新。"
-	messageLoginOK    = "登录成功。"
+	messageUsingToken = "Already signed in. Reusing the existing token."
+	messageRefreshed  = "Token refreshed."
+	messageLoginOK    = "Login successful."
 )
 
-const authorizationTimeout = 5 * time.Minute
+const authorizationTimeout = 30 * time.Minute
 
 var (
 	clientNameFlag string
 	noBrowserFlag  bool
 )
 
-var authCmd = &cobra.Command{Use: "auth", Short: "管理 OAuth2 认证"}
-var loginCmd = &cobra.Command{Use: "login", Short: "OAuth2 授权登录", RunE: runLogin}
+var authCmd = &cobra.Command{Use: "auth", Short: "Manage OAuth2 authentication"}
+var loginCmd = &cobra.Command{Use: "login", Short: "Sign in with OAuth2", RunE: runLogin}
 var logoutCmd = &cobra.Command{
 	Use:   "logout",
-	Short: "清除已存储的 OAuth Token",
-	Long:  "清除已存储的 OAuth Token。下次执行需要认证的命令时将重新触发登录。",
+	Short: "Clear the stored OAuth token",
+	Long:  "Clear the stored OAuth token. The next authenticated command will require sign-in again.",
 	Args:  cobra.NoArgs,
 	RunE:  runLogout,
 }
 var statusCmd = &cobra.Command{
-	Use: "status", Short: "本地查看 token、账户和行情权限状态", RunE: runStatus,
+	Use: "status", Short: "Show local token, account, and market-data permission status", RunE: runStatus,
 }
-var registerCmd = &cobra.Command{Use: "register", Short: "重新注册 OAuth2 客户端", RunE: runRegister}
+var registerCmd = &cobra.Command{Use: "register", Short: "Re-register the OAuth2 client", RunE: runRegister}
 
 func init() {
-	loginCmd.Flags().StringVar(&clientNameFlag, "client-name", "", "客户端名称，用于标识 AI agent（默认: 用户名@主机名）")
-	loginCmd.Flags().BoolVar(&noBrowserFlag, "no-browser", false, "不自动打开浏览器（默认: false）")
+	loginCmd.Flags().StringVar(&clientNameFlag, "client-name", "", "Client name used to identify the AI agent (default: user@host)")
+	loginCmd.Flags().BoolVar(&noBrowserFlag, "no-browser", false, "Do not open a browser automatically (default: false)")
 	authCmd.AddCommand(loginCmd, logoutCmd, statusCmd, registerCmd)
 	rootCmd.AddCommand(authCmd)
 }
@@ -99,7 +99,7 @@ func useExistingToken(path string) bool {
 		clientID = store.ClientID
 	}
 	if _, err := auth.EnsureValid(clientID, path); err != nil {
-		fmt.Fprintf(os.Stderr, "现有 token 刷新失败，将重新授权: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Existing token refresh failed; starting a new authorization: %v\n", err)
 		return false
 	}
 	if refreshed, err := auth.LoadToken(path); err == nil {
@@ -165,12 +165,12 @@ func newAuthorizationRequest(clientID, redirectURI string) (*authorizationReques
 }
 
 func presentAuthorizationURL(authURL string) error {
-	fmt.Fprintf(os.Stderr, "请在浏览器中完成授权:\n%s\n", authURL)
+	fmt.Fprintf(os.Stderr, "Complete authorization in your browser:\n%s\n", authURL)
 	if noBrowserFlag {
 		return nil
 	}
 	if err := openBrowser(authURL); err != nil {
-		fmt.Fprintf(os.Stderr, "无法自动打开浏览器，请手动访问上面的地址: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Could not open the browser automatically. Open the URL above manually: %v\n", err)
 	}
 	return nil
 }
@@ -181,7 +181,7 @@ func waitForCallback(server *auth.CallbackServer, redirectURI string) (*auth.Cal
 	if !noBrowserFlag {
 		return waitForHTTPCallback(ctx, server)
 	}
-	fmt.Fprintln(os.Stderr, "如果浏览器无法连接本机回调端口，请复制地址栏中的完整回调 URL 并粘贴到此处：")
+	fmt.Fprintln(os.Stderr, "If the browser cannot connect to the local callback port, copy the full callback URL from the address bar and paste it here:")
 	return waitForHTTPOrManualCallback(ctx, server, redirectURI)
 }
 
@@ -193,7 +193,7 @@ type callbackOutcome struct {
 func waitForHTTPCallback(ctx context.Context, server *auth.CallbackServer) (*auth.CallbackResult, error) {
 	result, err := server.WaitForCallback(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("等待授权: %w", err)
+		return nil, fmt.Errorf("waiting for authorization: %w", err)
 	}
 	return result, nil
 
@@ -211,11 +211,11 @@ func waitForHTTPOrManualCallback(
 	select {
 	case outcome := <-outcomes:
 		if outcome.err != nil {
-			return nil, fmt.Errorf("等待授权: %w", outcome.err)
+			return nil, fmt.Errorf("waiting for authorization: %w", outcome.err)
 		}
 		return outcome.result, nil
 	case <-ctx.Done():
-		return nil, fmt.Errorf("等待授权: %w", ctx.Err())
+		return nil, fmt.Errorf("waiting for authorization: %w", ctx.Err())
 	}
 }
 
@@ -228,7 +228,7 @@ func readManualCallback(redirectURI string, outcomes chan<- callbackOutcome) {
 		}
 		result, err := auth.ParseCallbackURL(strings.TrimSpace(value), redirectURI)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "回调 URL 无效，请重新粘贴: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Invalid callback URL. Paste it again: %v\n", err)
 			continue
 		}
 		outcomes <- callbackOutcome{result: result}
@@ -238,10 +238,10 @@ func readManualCallback(redirectURI string, outcomes chan<- callbackOutcome) {
 
 func exchangeAndSave(result *auth.CallbackResult, request *authorizationRequest, path string) error {
 	if len(result.Error) > 0 {
-		return fmt.Errorf("授权失败: %s", result.Error)
+		return fmt.Errorf("authorization failed: %s", result.Error)
 	}
 	if result.State != request.State {
-		return fmt.Errorf("state 校验失败，可能存在 CSRF 攻击")
+		return fmt.Errorf("state validation failed; possible CSRF attack")
 	}
 	response, err := auth.ExchangeCode(
 		request.ClientID, result.Code, request.RedirectURI, request.PKCE.CodeVerifier,

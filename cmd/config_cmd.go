@@ -6,15 +6,17 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/FutunnOpen/futu-cli/internal/config"
-	"github.com/FutunnOpen/futu-cli/internal/output"
+	"github.com/futunn/futu/internal/config"
+	"github.com/futunn/futu/internal/output"
 )
 
 var allConfigKeys = []string{
 	config.KeyAPIBase,
 	config.KeyClientID,
 	config.KeyRedirectURI,
+	config.KeyTokenFile,
 	config.KeyDefaultAcct,
+	config.KeyTelemetry,
 	config.KeyAutoUpdate,
 }
 
@@ -23,20 +25,20 @@ const (
 	configHeaderValue = "Value"
 )
 
-var configCmd = &cobra.Command{Use: "config", Short: "管理 CLI 配置"}
+var configCmd = &cobra.Command{Use: "config", Short: "Manage CLI configuration"}
 
 var configSetCmd = &cobra.Command{
-	Use: "set <key> <value>", Short: "设置配置项",
+	Use: "set <key> <value>", Short: "Set a config value",
 	Args: cobra.ExactArgs(2), RunE: runConfigSet,
 }
 
 var configGetCmd = &cobra.Command{
-	Use: "get <key>", Short: "查看配置项",
+	Use: "get <key>", Short: "Get a config value",
 	Args: cobra.ExactArgs(1), RunE: runConfigGet,
 }
 
-var configListCmd = &cobra.Command{Use: "list", Short: "列出所有配置项", RunE: runConfigList}
-var configInitCmd = &cobra.Command{Use: "init", Short: "初始化并登录 OAuth2", RunE: runConfigInit}
+var configListCmd = &cobra.Command{Use: "list", Short: "List all config values", RunE: runConfigList}
+var configInitCmd = &cobra.Command{Use: "init", Short: "Initialize configuration and sign in with OAuth2", RunE: runConfigInit}
 
 func init() {
 	configCmd.AddCommand(configSetCmd, configGetCmd, configListCmd, configInitCmd)
@@ -83,6 +85,6 @@ func renderConfigTable() {
 }
 
 func runConfigInit(_ *cobra.Command, _ []string) error {
-	fmt.Fprintln(os.Stderr, "正在启动 OAuth2 登录...")
+	fmt.Fprintln(os.Stderr, "Starting OAuth2 login...")
 	return runLogin(loginCmd, nil)
 }

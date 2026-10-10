@@ -20,6 +20,9 @@ const (
 	CodeServiceUnavail = "SERVICE_UNAVAILABLE"
 	CodeTimeout        = "TIMEOUT"
 	CodeUnknown        = "UNKNOWN"
+	CodeNoData         = "NO_DATA"
+	CodeUnsupported    = "UNSUPPORTED"
+	CodeInvalidSymbol  = "INVALID_SYMBOL"
 )
 
 // CLIError represents a structured CLI error with a machine-readable code,
@@ -43,6 +46,85 @@ func (e *CLIError) Error() string {
 type apiErrorResponse struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
+}
+
+// BFFError is the optional error object in a BFF envelope.
+type BFFError struct {
+	Code    string
+	Message string
+}
+
+// BFF ret_code values from bff_gateway_svr envelope.
+const (
+	bffCodeOK               = 0
+	bffCodeInvalidRequest   = -3
+	bffCodeInvalidSymbol    = -7
+	bffCodeUnsupported      = -8
+	bffCodePermissionDenied = -9
+	bffCodeNoData           = -10
+	bffCodeRateLimited      = -11
+)
+
+// FromBFF maps a BFF JSON envelope (HTTP 200 + ret_code) to a CLIError.
+func FromBFF(retCode int, retMsg string, bffErr *BFFError) error {
+	if retCode == bffCodeOK {
+		return nil
+	}
+	code := mapBFFRetCode(retCode)
+	msg := retMsg
+	if bffErr != nil {
+		if len(bffErr.Message) > 0 {
+			msg = bffErr.Message
+		}
+		if mapped := mapBFFErrCode(bffErr.Code); mapped != "" {
+			code = mapped
+		}
+	}
+	if len(msg) == 0 {
+		msg = fmt.Sprintf("BFF error (ret_code %d)", retCode)
+	}
+	return &CLIError{Code: code, Message: msg, Hint: hintFor(code)}
+}
+
+func mapBFFRetCode(retCode int) string {
+	switch retCode {
+	case bffCodeInvalidRequest:
+		return CodeBadRequest
+	case bffCodeInvalidSymbol:
+		return CodeInvalidSymbol
+	case bffCodeUnsupported:
+		return CodeUnsupported
+	case bffCodePermissionDenied:
+		return CodePermission
+	case bffCodeNoData:
+		return CodeNoData
+	case bffCodeRateLimited:
+		return CodeRateLimit
+	default:
+		if retCode < 0 {
+			return CodeServerError
+		}
+		return CodeUnknown
+	}
+}
+
+func mapBFFErrCode(errCode string) string {
+	switch errCode {
+	case "invalid_parameter":
+		return CodeBadRequest
+	case "invalid_symbol":
+		return CodeInvalidSymbol
+	case "unsupported":
+		return CodeUnsupported
+	case "permission_denied":
+		return CodePermission
+	case "no_data":
+		return CodeNoData
+	case "rate_limited":
+		return CodeRateLimit
+	default:
+		return ""
+	}
 }
 
 // FromAPI maps a server HTTP response to a CLIError.
@@ -150,6 +232,9 @@ func hintFor(code string) string {
 		CodeGatewayError:   "Gateway error. The service may be temporarily unavailable.",
 		CodeServiceUnavail: "Service is temporarily unavailable. Try again later.",
 		CodeTimeout:        "Request timed out. Check your network and try again.",
+		CodeNoData:         "The symbol is valid but the API returned no data for this query.",
+		CodeUnsupported:    "This market or instrument type is not supported by the API.",
+		CodeInvalidSymbol:  "Verify the symbol format (MARKET.CODE, e.g. HK.00700) and try again.",
 	}
 	return hints[code]
 }

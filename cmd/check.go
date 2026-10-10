@@ -10,8 +10,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/FutunnOpen/futu-cli/internal/auth"
-	"github.com/FutunnOpen/futu-cli/internal/output"
+	"github.com/futunn/futu/internal/auth"
+	"github.com/futunn/futu/internal/output"
 )
 
 const (
@@ -50,7 +50,7 @@ type checkResult struct {
 }
 
 var checkCmd = &cobra.Command{
-	Use: "check", Short: "验证 Token 有效性与 API 连通性", RunE: runCheck,
+	Use: "check", Short: "Validate token and API connectivity", RunE: runCheck,
 }
 
 func init() {

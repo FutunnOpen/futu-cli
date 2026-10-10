@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/FutunnOpen/futu-cli/internal/update"
+	"github.com/futunn/futu/internal/update"
 )
 
 // Update result messages.

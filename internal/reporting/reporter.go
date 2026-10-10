@@ -59,10 +59,9 @@ func NewReporter(opts Options) *Reporter {
 	if endpoint == "" {
 		endpoint = ReportURL(opts.Host)
 	}
-	enabled := opts.Enabled && endpoint != ""
 
 	r := &Reporter{
-		enabled:  enabled,
+		enabled:  opts.Enabled,
 		endpoint: endpoint,
 		token:    opts.Token,
 		client:   httpClient,

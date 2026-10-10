@@ -6,76 +6,66 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/FutunnOpen/futu-cli/internal/output"
-	"github.com/FutunnOpen/futu-cli/internal/service"
-	"github.com/FutunnOpen/futu-cli/pkg/symbol"
+	"github.com/futunn/futu/internal/output"
+	"github.com/futunn/futu/internal/service"
+	"github.com/futunn/futu/pkg/symbol"
 )
 
-// Default value for the ticker command count flag.
-const defaultTickerCount = 50
+const defaultTickerCount = 20
 
-// Table header labels for the ticker command.
-const (
-	tickerHeaderTime      = "Time"
-	tickerHeaderPrice     = "Price"
-	tickerHeaderVolume    = "Volume"
-	tickerHeaderDirection = "Direction"
-)
-
-// tickerFlags holds the flag values for the ticker command.
 var tickerFlags struct {
-	count int
+	count   int
+	periods []string
 }
 
 var tickerCmd = &cobra.Command{
-	Use:   "ticker <symbol>",
-	Short: "获取逐笔成交",
-	Long:  "获取指定标的的逐笔成交（tick-by-tick）数据，包含成交价、成交量和方向。",
-	Args:  cobra.ExactArgs(1),
-	RunE:  runTicker,
+	Use:     "ticker <symbol>",
+	GroupID: quoteGroupID,
+	Short:   "Get tick-by-tick trades",
+	Long:    "Get the latest tick-by-tick trades for the specified symbol. --period can be repeated: NORMAL / BEFORE / AFTER / OVERNIGHT.",
+	Example: `  futu ticker HK.00700
+  futu ticker US.AAPL --num 50 --period OVERNIGHT
+  futu ticker HK.00700 --format json`,
+	Args: cobra.ExactArgs(1),
+	RunE: runTicker,
 }
 
 func init() {
+	tickerCmd.Flags().IntVarP(&tickerFlags.count, "num", "n", defaultTickerCount,
+		"Return the latest N ticks (default: 20, range 1-750)")
+	tickerCmd.Flags().StringArrayVar(&tickerFlags.periods, "period", nil,
+		"Filter by trading period (default: no filter; backend returns the current period). Repeatable: NORMAL / BEFORE / AFTER / OVERNIGHT")
 	tickerCmd.Flags().IntVarP(&tickerFlags.count, "count", "c", defaultTickerCount,
-		"返回逐笔成交条数")
+		"Same as --num (legacy compatibility)")
 	rootCmd.AddCommand(tickerCmd)
 }
 
-// runTicker is the top-level handler for the ticker command.
 func runTicker(cmd *cobra.Command, args []string) error {
 	sym, err := symbol.Parse(args[0])
 	if err != nil {
 		return fmt.Errorf("parsing symbol: %w", err)
 	}
-
-	ctx := cmdContext(cmd)
-	ticks, err := quoteSvc.GetTicker(ctx, sym.Full, tickerFlags.count)
+	result, err := quoteSvc.GetRTTicker(cmdContext(cmd), sym.FutuCode(), service.RTTickerParams{
+		Num:     tickerFlags.count,
+		Periods: tickerFlags.periods,
+	})
 	if err != nil {
-		return fmt.Errorf("fetching ticker: %w", err)
+		return err
 	}
-
-	printResult(ticks, func() {
-		renderTickerTable(ticks)
+	printBFFResult(result, func() {
+		renderTickerTable(jsonObjectList(decodeJSONValue(result.Data), "ticker_list"))
 	})
 	return nil
 }
 
-// renderTickerTable writes tick-by-tick trade data as a formatted table
-// to stdout.
-func renderTickerTable(ticks []service.Ticker) {
-	tw := output.NewTableWriter(os.Stdout,
-		tickerHeaderTime,
-		tickerHeaderPrice,
-		tickerHeaderVolume,
-		tickerHeaderDirection,
-	)
-
-	for _, t := range ticks {
+func renderTickerTable(ticks []map[string]any) {
+	tw := output.NewTableWriter(os.Stdout, "Time", "Price", "Volume", "Direction")
+	for _, tick := range ticks {
 		tw.AddRow(
-			formatTimestamp(t.Time),
-			fmt.Sprintf("%.3f", t.Price),
-			fmt.Sprintf("%d", t.Volume),
-			t.Direction,
+			formatTimestamp(jsonInt(tick, "time")),
+			formatPrice(jsonFloat(tick, "price")),
+			fmt.Sprintf("%d", jsonInt(tick, "volume")),
+			firstNonEmpty(jsonString(tick, "ticker_direction"), jsonString(tick, "direction")),
 		)
 	}
 	tw.Render()

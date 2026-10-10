@@ -7,8 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/FutunnOpen/futu-cli/internal/output"
-	"github.com/FutunnOpen/futu-cli/internal/service"
+	"github.com/futunn/futu/internal/output"
+	"github.com/futunn/futu/internal/service"
 )
 
 // Table header labels for the deal command.
@@ -27,15 +27,15 @@ const (
 
 var dealCmd = &cobra.Command{
 	Use:   "deal",
-	Short: "查询当日成交",
-	Long:  "查询指定账户的当日成交记录，支持按交易市场分页获取。",
+	Short: "Query today's fills",
+	Long:  "Query today's fills for the specified account, with pagination by trading market.",
 	RunE:  runDeal,
 }
 
 var dealHistoryCmd = &cobra.Command{
 	Use:   "history",
-	Short: "查询历史成交",
-	Long:  "查询指定账户的历史成交记录，支持按市场、时间范围和标的过滤。",
+	Short: "Query historical fills",
+	Long:  "Query historical fills for the specified account, with filters for market, time range, and symbol.",
 	Args:  cobra.NoArgs,
 	RunE:  runDealHistory,
 }
@@ -48,16 +48,16 @@ func init() {
 }
 
 func registerDealFlags(cmd *cobra.Command) {
-	cmd.Flags().StringP("account", "a", "", "交易账户（默认: 配置 default_account）")
-	cmd.Flags().StringP("market", "m", service.DefaultTradingMarket, "交易市场: HK, US, HKCC, SG, JP, AU, MY, KR（默认: HK）")
-	cmd.Flags().Int("page-size", service.DefaultPageSize, "每页数量，范围 10-100（默认: 50）")
+	cmd.Flags().StringP("account", "a", "", "Trading account ID (default: config default_account)")
+	cmd.Flags().StringP("market", "m", service.DefaultTradingMarket, "Trading market: HK, US, HKCC, SG, JP, AU, MY, KR (default: HK)")
+	cmd.Flags().Int("page-size", service.DefaultPageSize, "Page size, range 10-100 (default: 50)")
 }
 
 func registerDealHistoryFlags(cmd *cobra.Command) {
 	registerDealFlags(cmd)
-	cmd.Flags().Int64("start", 0, "查询开始时间，微秒时间戳（默认: 不限制）")
-	cmd.Flags().Int64("end", 0, "查询结束时间，微秒时间戳（默认: 不限制）")
-	cmd.Flags().String("symbol", "", "标的代码过滤（默认: 不过滤）")
+	cmd.Flags().Int64("start", 0, "Start time as a microsecond timestamp (default: no lower bound)")
+	cmd.Flags().Int64("end", 0, "End time as a microsecond timestamp (default: no upper bound)")
+	cmd.Flags().String("symbol", "", "Symbol filter (default: no filter)")
 }
 
 // runDeal is the top-level handler for the deal command.
