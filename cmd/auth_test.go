@@ -13,8 +13,10 @@ import (
 func TestEnsureClientIDReusesStoredRegistration(t *testing.T) {
 	previousConfig := cfg
 	cfg = &config.Config{
-		ClientID:    "stored-client-id",
-		RedirectURI: "http://127.0.0.1:18888/callback",
+		APIBase:         "https://webapi.futunn.com",
+		ClientID:        "stored-client-id",
+		ClientIDAPIBase: "webapi.futunn.com",
+		RedirectURI:     "http://127.0.0.1:18888/callback",
 	}
 	t.Cleanup(func() { cfg = previousConfig })
 
@@ -24,6 +26,79 @@ func TestEnsureClientIDReusesStoredRegistration(t *testing.T) {
 	}
 	if clientID != cfg.ClientID {
 		t.Fatalf("client ID = %q, want %q", clientID, cfg.ClientID)
+	}
+}
+
+func TestEnsureClientIDRegistersWhenAPIBaseHostChanges(t *testing.T) {
+	previousConfig := cfg
+	previousRegister := registerOAuthClient
+	t.Setenv("HOME", t.TempDir())
+	cfg = &config.Config{
+		APIBase:         "https://uat-webapi.futunn.com",
+		ClientID:        "old-client-id",
+		ClientIDAPIBase: "webapi.futunn.com",
+		RedirectURI:     "http://127.0.0.1:18888/callback",
+		TokenFile:       t.TempDir() + "/token.json",
+	}
+	registerOAuthClient = func(_ string, redirectURIs []string) (*auth.RegistrationResponse, error) {
+		if len(redirectURIs) != 1 || redirectURIs[0] != cfg.RedirectURI {
+			t.Fatalf("redirect URIs = %#v", redirectURIs)
+		}
+		return &auth.RegistrationResponse{ClientID: "new-client-id"}, nil
+	}
+	t.Cleanup(func() {
+		cfg = previousConfig
+		registerOAuthClient = previousRegister
+	})
+
+	clientID, err := ensureClientID([]string{cfg.RedirectURI})
+	if err != nil {
+		t.Fatalf("ensureClientID() error = %v", err)
+	}
+	if clientID != "new-client-id" || cfg.ClientID != "new-client-id" {
+		t.Fatalf("client ID = %q, config = %q; want new-client-id", clientID, cfg.ClientID)
+	}
+	if cfg.ClientIDAPIBase != "uat-webapi.futunn.com" {
+		t.Fatalf("client_id_api_base = %q", cfg.ClientIDAPIBase)
+	}
+}
+
+func TestAPIBaseHostNormalizesSchemePortAndPath(t *testing.T) {
+	got, err := apiBaseHost("https://WebAPI.Futunn.com:443/api/v1.0")
+	if err != nil {
+		t.Fatalf("apiBaseHost() error = %v", err)
+	}
+	if got != "webapi.futunn.com" {
+		t.Fatalf("host = %q, want webapi.futunn.com", got)
+	}
+}
+
+func TestStatusRefreshClientIDUsesMatchingConfiguredClientID(t *testing.T) {
+	previousConfig := cfg
+	cfg = &config.Config{
+		APIBase:         "https://webapi.futunn.com",
+		ClientID:        "configured-client-id",
+		ClientIDAPIBase: "webapi.futunn.com",
+	}
+	t.Cleanup(func() { cfg = previousConfig })
+
+	clientID, err := statusRefreshClientID(&auth.TokenStore{ClientID: "stored-client-id"})
+	if err != nil {
+		t.Fatalf("statusRefreshClientID() error = %v", err)
+	}
+	if clientID != cfg.ClientID {
+		t.Fatalf("client ID = %q, want %q", clientID, cfg.ClientID)
+	}
+}
+
+func TestStatusRefreshClientIDRejectsUnboundStoredClientID(t *testing.T) {
+	previousConfig := cfg
+	cfg = &config.Config{APIBase: "https://webapi.futunn.com"}
+	t.Cleanup(func() { cfg = previousConfig })
+
+	_, err := statusRefreshClientID(&auth.TokenStore{ClientID: "stored-client-id"})
+	if err == nil {
+		t.Fatal("expected stored token client_id without matching api_base to be rejected")
 	}
 }
 

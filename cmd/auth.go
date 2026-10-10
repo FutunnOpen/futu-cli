@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"runtime"
@@ -53,6 +54,8 @@ var (
 	noBrowserFlag  bool
 )
 
+var registerOAuthClient = auth.RegisterClient
+
 var authCmd = &cobra.Command{Use: "auth", Short: "Manage OAuth2 authentication"}
 var loginCmd = &cobra.Command{Use: "login", Short: "Sign in with OAuth2", RunE: runLogin}
 var logoutCmd = &cobra.Command{
@@ -85,6 +88,9 @@ func runLogin(_ *cobra.Command, _ []string) error {
 }
 
 func useExistingToken(path string) bool {
+	if !clientIDMatchesCurrentAPIBase() {
+		return false
+	}
 	store, err := auth.LoadToken(path)
 	if err != nil {
 		return false
@@ -253,14 +259,18 @@ func exchangeAndSave(result *auth.CallbackResult, request *authorizationRequest,
 }
 
 func ensureClientID(redirectURIs []string) (string, error) {
-	if len(cfg.ClientID) > 0 && cfg.RedirectURI == redirectURIs[0] {
+	if len(cfg.ClientID) > 0 && cfg.RedirectURI == redirectURIs[0] && clientIDMatchesCurrentAPIBase() {
 		return cfg.ClientID, nil
 	}
 	return registerAndSaveClientID(redirectURIs)
 }
 
 func registerAndSaveClientID(redirectURIs []string) (string, error) {
-	response, err := auth.RegisterClient(auth.BuildClientName(clientNameFlag), redirectURIs)
+	apiBaseHost, err := currentAPIBaseHost()
+	if err != nil {
+		return "", err
+	}
+	response, err := registerOAuthClient(auth.BuildClientName(clientNameFlag), redirectURIs)
 	if err != nil {
 		return "", fmt.Errorf("client registration: %w", err)
 	}
@@ -270,10 +280,66 @@ func registerAndSaveClientID(redirectURIs []string) (string, error) {
 	if err := cfg.Set(config.KeyRedirectURI, redirectURIs[0]); err != nil {
 		return "", fmt.Errorf("set redirect_uri: %w", err)
 	}
+	if err := cfg.Set(config.KeyClientIDAPIBase, apiBaseHost); err != nil {
+		return "", fmt.Errorf("set client_id_api_base: %w", err)
+	}
 	if err := cfg.Save(); err != nil {
 		return "", fmt.Errorf("save config: %w", err)
 	}
 	return response.ClientID, nil
+}
+
+func clientIDMatchesCurrentAPIBase() bool {
+	if cfg == nil || len(cfg.ClientID) == 0 || len(cfg.ClientIDAPIBase) == 0 {
+		return false
+	}
+	apiBaseHost, err := currentAPIBaseHost()
+	if err != nil {
+		return false
+	}
+	return strings.EqualFold(cfg.ClientIDAPIBase, apiBaseHost)
+}
+
+func currentAPIBaseHost() (string, error) {
+	if cfg == nil {
+		return "", fmt.Errorf("configuration not loaded; please check your config file")
+	}
+	return apiBaseHost(cfg.APIBase)
+}
+
+func apiBaseHost(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if len(value) == 0 {
+		return "", fmt.Errorf("api_base cannot be empty")
+	}
+	parsed, err := url.Parse(value)
+	if err != nil || len(parsed.Host) == 0 {
+		parsed, err = url.Parse("https://" + value)
+	}
+	if err != nil {
+		return "", fmt.Errorf("parse api_base: %w", err)
+	}
+	host := strings.ToLower(parsed.Hostname())
+	if len(host) == 0 {
+		return "", fmt.Errorf("api_base must include a host")
+	}
+	return host, nil
+}
+
+func clientIDAPIBaseMismatchError() error {
+	currentHost, err := currentAPIBaseHost()
+	if err != nil {
+		return err
+	}
+	registeredHost := cfg.ClientIDAPIBase
+	if len(registeredHost) == 0 {
+		registeredHost = "unknown"
+	}
+	return fmt.Errorf(
+		"client_id is registered for api_base host %q, current api_base host is %q\nRun 'futu auth login' to register a client_id for the current api_base",
+		registeredHost,
+		currentHost,
+	)
 }
 
 func runRegister(_ *cobra.Command, _ []string) error {
@@ -413,14 +479,24 @@ func refreshTokenIfExpired(path string, store *auth.TokenStore) (*auth.TokenStor
 	if !store.IsExpired() {
 		return store, nil
 	}
-	return auth.RefreshStoredToken(statusRefreshClientID(store), path, store)
+	clientID, err := statusRefreshClientID(store)
+	if err != nil {
+		return nil, err
+	}
+	return auth.RefreshStoredToken(clientID, path, store)
 }
 
-func statusRefreshClientID(store *auth.TokenStore) string {
+func statusRefreshClientID(store *auth.TokenStore) (string, error) {
 	if cfg != nil && len(cfg.ClientID) > 0 {
-		return cfg.ClientID
+		if !clientIDMatchesCurrentAPIBase() {
+			return "", clientIDAPIBaseMismatchError()
+		}
+		return cfg.ClientID, nil
 	}
-	return store.ClientID
+	if len(store.ClientID) > 0 {
+		return "", fmt.Errorf("stored token client_id cannot be used without a matching %s\nRun 'futu auth login' to register a client_id for the current api_base", config.KeyClientIDAPIBase)
+	}
+	return "", fmt.Errorf("client_id is not configured\nRun 'futu auth login' to register a client_id for the current api_base")
 }
 
 func tokenFileModTime(path string) time.Time {

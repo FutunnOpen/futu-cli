@@ -207,6 +207,9 @@ func initOAuthClient() error {
 	if len(cfg.ClientID) == 0 {
 		return fmt.Errorf("client_id is not configured\nRun 'futu config init' to register the OAuth client")
 	}
+	if !clientIDMatchesCurrentAPIBase() {
+		return clientIDAPIBaseMismatchError()
+	}
 
 	token, err := auth.EnsureValid(cfg.ClientID, effectiveTokenFile())
 	if err != nil {

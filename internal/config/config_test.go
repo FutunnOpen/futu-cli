@@ -12,3 +12,14 @@ func TestTelemetryIsNotConfigurable(t *testing.T) {
 		t.Fatal("expected telemetry to be rejected as an unknown config key")
 	}
 }
+
+func TestClientIDAPIBaseConfigRoundTrip(t *testing.T) {
+	cfg := DefaultConfig()
+
+	if err := cfg.Set(KeyClientIDAPIBase, "webapi.futunn.com"); err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
+	if got := cfg.Get(KeyClientIDAPIBase); got != "webapi.futunn.com" {
+		t.Fatalf("client_id_api_base = %q", got)
+	}
+}
