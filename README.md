@@ -56,6 +56,12 @@ Run a quote query:
 futu quote US.AAPL
 ```
 
+List simulated trading accounts:
+
+```bash
+futu sim account list
+```
+
 ## Update
 
 Check whether a newer stable GitHub Release is available:
@@ -121,6 +127,54 @@ Most commands support `--format json` for JSON output and `--format table` (defa
 | `futu check` | Verify token validity online and measure API HTTP latency |
 | `futu check --format json` | Verify token and API connectivity as JSON |
 
+### Market Data
+
+| Command | Description |
+|---------|-------------|
+| `futu quote <symbol...>` | Query real-time quotes for one or more securities |
+| `futu basicinfo <symbol...>` | Query static security information |
+| `futu snapshot <symbol...>` | Query market snapshots in batch |
+| `futu kline <symbol>` | Query recent K-line/candlestick data |
+| `futu history-kline <symbol>` | Query historical K-line data; supports `--start`, `--end`, and pagination via `--next-time` |
+| `futu ticker <symbol>` | Query recent time-and-sales ticks |
+| `futu rt-data <symbol>` | Query intraday time-sharing data |
+| `futu order-book <symbol>` | Query order book depth; `futu depth <symbol>` is an alias |
+| `futu rank [type]` | Query market rankings such as volume, turnover, gainers, losers, and amplitude |
+| `futu option chain <symbol>` | Query option chains |
+| `futu broker <symbol>` | Query broker queues; use `--view history` for historical broker data |
+| `futu capital <symbol>` | Query capital flow; use `--view history` or `--view distribution` for other views |
+| `futu company <symbol>` | Query company profile, executives, executive background, or operational efficiency |
+| `futu corporate-actions <symbol>` | Query dividends, splits, buybacks, or rehab data |
+| `futu economic-calendar [keyword]` | Query hot economic events or search economic calendar items |
+| `futu financials <symbol>` | Query financial statements, revenue breakdown, and earnings-related data |
+| `futu ipo-list` | Query IPO lists by market |
+| `futu option-data <symbol>` | Query option expiration, strategy, spread, exercise probability, or volatility data |
+| `futu plate [symbol]` | Query plate lists, plate stocks, or owner plates |
+| `futu research <symbol>` | Query analyst consensus, Morningstar reports, or rating summaries |
+| `futu search [keyword]` | Search news, community posts, or stock feeds |
+| `futu shareholders <symbol>` | Query shareholder overview, institutional holders, holding changes, and insider data |
+| `futu short <symbol>` | Query short volume or short interest |
+| `futu valuation [symbol]` | Query valuation detail, plate stocks, index stocks, or index plates |
+| `futu watchlist [symbol...]` | List watchlists or add/delete/move securities |
+| `futu future-info <symbol...>` | Query futures contract information |
+| `futu market-state <symbol...>` | Query market state for one or more symbols |
+| `futu combo-option-quote` | Query combo option quotes; requires `--combo-list` JSON |
+| `futu referencefuture-list <symbol>` | Query related futures contracts |
+| `futu stock-screen` | Run stock screening queries |
+| `futu warrant-screen` | Run warrant screening queries |
+| `futu option-screen` | Run option screening queries |
+| `futu trading-days` | Query trading days by market and date range |
+
+Examples:
+
+```bash
+futu quote HK.00700 US.AAPL --format json
+futu kline US.AAPL --ktype 1 --format json
+futu capital HK.00700 --view history --period-type WEEK --format json
+futu plate --view list --market HK --plate-class INDUSTRY --format json
+futu trading-days --market US --start 2026-10-01 --end 2026-10-31 --format json
+```
+
 ### Trading
 
 | Command | Description |
@@ -139,6 +193,36 @@ Most commands support `--format json` for JSON output and `--format table` (defa
 | `futu order max-qty <symbol>` | Query max buy/sell/sell-short/buy-back quantities and margin requirements |
 | `futu deal` | List today's filled trades |
 | `futu deal history` | List historical filled trades; supports `--market`, `--symbol US.AAPL`, `--start`/`--end` (microseconds) |
+
+### Simulated Trading
+
+Simulated trading commands are grouped under `futu sim`. If `--account` is omitted, the CLI uses the first simulated account returned by `futu sim account list`.
+
+| Command | Description |
+|---------|-------------|
+| `futu sim account list` | List simulated trading accounts |
+| `futu sim account funds` | Query simulated account funds and assets |
+| `futu sim position` | List simulated positions; supports `--market` |
+| `futu sim order list` | List active simulated orders |
+| `futu sim order history` | List historical simulated orders; supports `--start`/`--end`, `--page-size`, and `--next-key` |
+| `futu sim order max-qty <symbol>` | Query max simulated buy/sell quantity for a symbol |
+| `futu sim order buy <symbol> <qty>` | Place a simulated buy order |
+| `futu sim order sell <symbol> <qty>` | Place a simulated sell order |
+| `futu sim order place <qty>` | Place a generic simulated order; direction via `--side` and symbol via `--symbol` |
+| `futu sim order modify <order-id>` | Modify simulated order quantity and/or price |
+| `futu sim order cancel <order-id>` | Cancel a simulated order |
+
+Examples:
+
+```bash
+futu sim account list --format json
+futu sim account funds --format json
+futu sim position --market US --format json
+futu sim order max-qty US.AAPL --market US --format json
+futu sim order buy US.AAPL 1 --market US --type market --format json
+futu sim order modify <order-id> --market US --qty 2 --price 181 --format json
+futu sim order cancel <order-id> --market US --format json
+```
 
 ### Crypto
 
