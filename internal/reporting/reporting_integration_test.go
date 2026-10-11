@@ -39,7 +39,7 @@ func TestIntegrationReportToolCall(t *testing.T) {
 	}
 
 	event := BuildEvent(BuildInput{
-		Source:          "1",
+		Source:          "3",
 		AgentName:       "cli",
 		Platform:        "futu",
 		Command:         "integration reporting test",

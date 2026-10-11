@@ -67,8 +67,8 @@ func TestSanitizeNonCoarseOnlyRedactsCredentialFields(t *testing.T) {
 }
 
 func TestBuildEventGeneratesUniqueTraceID(t *testing.T) {
-	first := BuildEvent(BuildInput{Source: "1", Method: http.MethodGet, APIPath: "/v1/quote/kline"})
-	second := BuildEvent(BuildInput{Source: "1", Method: http.MethodGet, APIPath: "/v1/quote/kline"})
+	first := BuildEvent(BuildInput{Source: "3", Method: http.MethodGet, APIPath: "/v1/quote/kline"})
+	second := BuildEvent(BuildInput{Source: "3", Method: http.MethodGet, APIPath: "/v1/quote/kline"})
 	if first.TraceID == "" || second.TraceID == "" || first.TraceID == second.TraceID {
 		t.Fatalf("trace ids should be non-empty and unique: %q %q", first.TraceID, second.TraceID)
 	}
@@ -77,6 +77,14 @@ func TestBuildEventGeneratesUniqueTraceID(t *testing.T) {
 	}
 	if first.ToolID != unknownToolID {
 		t.Fatalf("tool id = %q, want %q", first.ToolID, unknownToolID)
+	}
+}
+
+func TestReportURLUsesDefaultProductionHost(t *testing.T) {
+	got := ReportURL("")
+	want := "https://ai-report.futunn.com/agent_report/call"
+	if got != want {
+		t.Fatalf("ReportURL(\"\") = %q, want %q", got, want)
 	}
 }
 

@@ -36,15 +36,15 @@ func TestEnsureClientIDRegistersWhenAPIBaseHostChanges(t *testing.T) {
 	previousRegister := registerOAuthClient
 	t.Setenv("HOME", t.TempDir())
 	cfg = &config.Config{
-		APIBase:         "https://uat-webapi.futunn.com",
+		APIBase:         "https://alt-webapi.example.test",
 		ClientID:        "old-client-id",
 		ClientIDAPIBase: "webapi.futunn.com",
 		RedirectURI:     "http://127.0.0.1:18888/callback",
 		TokenFile:       t.TempDir() + "/token.json",
 	}
 	registerOAuthClient = func(baseURL, _ string, redirectURIs []string) (*auth.RegistrationResponse, error) {
-		if baseURL != "https://uat-webapi.futunn.com" {
-			t.Fatalf("baseURL = %q, want https://uat-webapi.futunn.com", baseURL)
+		if baseURL != "https://alt-webapi.example.test" {
+			t.Fatalf("baseURL = %q, want https://alt-webapi.example.test", baseURL)
 		}
 		if len(redirectURIs) != 1 || redirectURIs[0] != cfg.RedirectURI {
 			t.Fatalf("redirect URIs = %#v", redirectURIs)
@@ -63,10 +63,10 @@ func TestEnsureClientIDRegistersWhenAPIBaseHostChanges(t *testing.T) {
 	if clientID != "new-client-id" || cfg.ClientID != "new-client-id" {
 		t.Fatalf("client ID = %q, config = %q; want new-client-id", clientID, cfg.ClientID)
 	}
-	if cfg.ClientIDAPIBase != "uat-webapi.futunn.com" {
+	if cfg.ClientIDAPIBase != "alt-webapi.example.test" {
 		t.Fatalf("client_id_api_base = %q", cfg.ClientIDAPIBase)
 	}
-	if cfg.ClientIDOAuthBase != "https://uat-webapi.futunn.com" {
+	if cfg.ClientIDOAuthBase != "https://alt-webapi.example.test" {
 		t.Fatalf("client_id_oauth_base = %q", cfg.ClientIDOAuthBase)
 	}
 }
@@ -115,15 +115,15 @@ func TestEnsureClientIDRegistersWhenOAuthBaseBindingIsMissing(t *testing.T) {
 	previousRegister := registerOAuthClient
 	t.Setenv("HOME", t.TempDir())
 	cfg = &config.Config{
-		APIBase:         "https://uat-webapi.futunn.com",
+		APIBase:         "https://alt-webapi.example.test",
 		ClientID:        "old-client-id",
-		ClientIDAPIBase: "uat-webapi.futunn.com",
+		ClientIDAPIBase: "alt-webapi.example.test",
 		RedirectURI:     "http://127.0.0.1:18888/callback",
 		TokenFile:       t.TempDir() + "/token.json",
 	}
 	registerOAuthClient = func(baseURL, _ string, redirectURIs []string) (*auth.RegistrationResponse, error) {
-		if baseURL != "https://uat-webapi.futunn.com" {
-			t.Fatalf("baseURL = %q, want https://uat-webapi.futunn.com", baseURL)
+		if baseURL != "https://alt-webapi.example.test" {
+			t.Fatalf("baseURL = %q, want https://alt-webapi.example.test", baseURL)
 		}
 		if len(redirectURIs) != 1 || redirectURIs[0] != cfg.RedirectURI {
 			t.Fatalf("redirect URIs = %#v", redirectURIs)
@@ -142,7 +142,7 @@ func TestEnsureClientIDRegistersWhenOAuthBaseBindingIsMissing(t *testing.T) {
 	if clientID != "new-client-id" || cfg.ClientID != "new-client-id" {
 		t.Fatalf("client ID = %q, config = %q; want new-client-id", clientID, cfg.ClientID)
 	}
-	if cfg.ClientIDOAuthBase != "https://uat-webapi.futunn.com" {
+	if cfg.ClientIDOAuthBase != "https://alt-webapi.example.test" {
 		t.Fatalf("client_id_oauth_base = %q", cfg.ClientIDOAuthBase)
 	}
 }
@@ -159,7 +159,7 @@ func TestAPIBaseHostNormalizesSchemePortAndPath(t *testing.T) {
 
 func TestAuthorizationURLUsesConfiguredAPIBase(t *testing.T) {
 	previousConfig := cfg
-	cfg = &config.Config{APIBase: "https://uat-webapi.futunn.com/api/v1.0"}
+	cfg = &config.Config{APIBase: "https://alt-webapi.example.test/api/v1.0"}
 	t.Cleanup(func() { cfg = previousConfig })
 
 	request := &authorizationRequest{
@@ -171,7 +171,7 @@ func TestAuthorizationURLUsesConfiguredAPIBase(t *testing.T) {
 	if err := assignAuthorizationURL(request); err != nil {
 		t.Fatalf("assignAuthorizationURL() error = %v", err)
 	}
-	if !strings.HasPrefix(request.URL, "https://uat-webapi.futunn.com/oauth2/authorize/confirm?") {
+	if !strings.HasPrefix(request.URL, "https://alt-webapi.example.test/oauth2/authorize/confirm?") {
 		t.Fatalf("authorization URL = %q", request.URL)
 	}
 }

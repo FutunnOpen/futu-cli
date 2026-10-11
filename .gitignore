@@ -2,6 +2,8 @@
 /skills/
 /npm/vendor/
 /dist/
+/.cache/
+/futu
 *.log
 [Tt][Oo][Dd][Oo].md
 /v[0-9]*/

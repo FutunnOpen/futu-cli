@@ -4,13 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"runtime"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 
-	"github.com/futunn/futu/internal/analytics"
 	"github.com/futunn/futu/internal/auth"
 	"github.com/futunn/futu/internal/client"
 	"github.com/futunn/futu/internal/config"
@@ -32,7 +30,7 @@ const (
 const (
 	reportSourceModeCLI     = "cli"
 	reportSourceModeSkill   = "skill"
-	reportSourceFutuCLI     = "1"
+	reportSourceFutuCLI     = "3"
 	reportSourceFutuSkill   = "7"
 	internalSourceFlag      = "--source"
 	internalSourcePrefix    = "--source="
@@ -50,9 +48,6 @@ const (
 	envClaudeCodeSession    = "CLAUDE_CODE_SESSION_ID"
 	envClaudeCodeEntrypoint = "CLAUDE_CODE_ENTRYPOINT"
 )
-
-// Analytics endpoint path.
-const analyticsEndpoint = "/v1/analytics/cli"
 
 // Unix timestamp magnitude thresholds.
 const (
@@ -74,7 +69,6 @@ var (
 	quoteSvc         *service.QuoteService
 	tradeSvc         *service.TradeService
 	cryptoSvc        *service.CryptoService
-	reporter         *analytics.Reporter
 	requestReporter  *reporting.Reporter
 	cmdStartTime     time.Time
 )
@@ -155,7 +149,7 @@ func init() {
 }
 
 // initSharedState loads config, ensures auth (when needed), and initializes
-// the HTTP client, services, and analytics reporter.
+// the HTTP client and services.
 func initSharedState(cmd *cobra.Command) error {
 	if commandOrParentMatches(cmd, noConfigCommands) {
 		return nil
@@ -166,10 +160,6 @@ func initSharedState(cmd *cobra.Command) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	reporter = analytics.NewReporter(
-		cfg.APIBase+analyticsEndpoint,
-		true,
-	)
 	if cfg.AutoUpdate {
 		update.RefreshCacheIfStale(Version)
 	}
@@ -402,21 +392,9 @@ func initServices() {
 	cryptoSvc = service.NewCryptoService(httpClient)
 }
 
-// reportAndCheckUpdate sends analytics and prints an update notice if available.
+// reportAndCheckUpdate flushes request reporting and prints an update notice if available.
 func reportAndCheckUpdate(cmd *cobra.Command) {
 	defer flushRequestReporter()
-
-	if reporter != nil {
-		reporter.Report(analytics.Event{
-			Command:    cmd.Name(),
-			Outcome:    "success",
-			DurationMs: time.Since(cmdStartTime).Milliseconds(),
-			Version:    Version,
-			OS:         runtime.GOOS,
-			Arch:       runtime.GOARCH,
-			AgentName:  effectiveAgentName(),
-		})
-	}
 
 	if cfg != nil && cfg.AutoUpdate && !isJSONOutput() {
 		update.NotifyIfAvailable(Version)

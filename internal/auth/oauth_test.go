@@ -131,7 +131,7 @@ func TestBuildAuthorizationURL(t *testing.T) {
 func TestBuildAuthorizationURLWithBaseURL(t *testing.T) {
 	pkce := &PKCEParams{CodeChallenge: "challenge123", Method: "S256"}
 	authURL, err := BuildAuthorizationURLWithBaseURL(
-		"https://UAT-WebAPI.Futunn.com:8443/api/v1.0",
+		"https://ALT-WebAPI.Example.Test:8443/api/v1.0",
 		"cid-001",
 		"http://127.0.0.1:18888/callback",
 		pkce,
@@ -145,7 +145,7 @@ func TestBuildAuthorizationURLWithBaseURL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse URL: %v", err)
 	}
-	if parsed.Scheme != "https" || parsed.Host != "uat-webapi.futunn.com:8443" {
+	if parsed.Scheme != "https" || parsed.Host != "alt-webapi.example.test:8443" {
 		t.Fatalf("origin = %s://%s", parsed.Scheme, parsed.Host)
 	}
 	if parsed.Path != authorizeURL {
@@ -154,12 +154,12 @@ func TestBuildAuthorizationURLWithBaseURL(t *testing.T) {
 }
 
 func TestOAuthBaseOriginDefaultsSchemeAndDropsPath(t *testing.T) {
-	origin, err := OAuthBaseOrigin("UAT-WebAPI.Futunn.com/api/v1.0")
+	origin, err := OAuthBaseOrigin("ALT-WebAPI.Example.Test/api/v1.0")
 	if err != nil {
 		t.Fatalf("OAuthBaseOrigin() error = %v", err)
 	}
-	if origin != "https://uat-webapi.futunn.com" {
-		t.Fatalf("origin = %q, want https://uat-webapi.futunn.com", origin)
+	if origin != "https://alt-webapi.example.test" {
+		t.Fatalf("origin = %q, want https://alt-webapi.example.test", origin)
 	}
 }
 

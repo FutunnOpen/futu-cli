@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -364,6 +365,12 @@ func TestCallReportsThroughAsyncReporter(t *testing.T) {
 		if event.Source != 1 || event.AgentName != "codex" || event.Platform != "futu" {
 			t.Fatalf("unexpected source metadata: %+v", event)
 		}
+		if event.Command != "futu order place" {
+			t.Fatalf("command = %q, want futu order place", event.Command)
+		}
+		if event.Version != "v1.2.3" || event.OS != runtime.GOOS || event.Arch != runtime.GOARCH {
+			t.Fatalf("unexpected runtime metadata: %+v", event)
+		}
 		if event.ToolID != "trading_order_place" {
 			t.Fatalf("tool id = %q, want trading_order_place", event.ToolID)
 		}
@@ -375,6 +382,12 @@ func TestCallReportsThroughAsyncReporter(t *testing.T) {
 		}
 		if event.OrderID != "OID-1" {
 			t.Fatalf("order id = %q, want OID-1", event.OrderID)
+		}
+		if event.StatusCode != http.StatusOK || event.DurationMs < 0 || event.CreatedAt == 0 {
+			t.Fatalf("unexpected status/timing metadata: %+v", event)
+		}
+		if event.Method != http.MethodPost || event.RequestBody == "" || event.ResponseBody == "" {
+			t.Fatalf("missing request/response metadata: %+v", event)
 		}
 		if event.TraceID == "" {
 			t.Fatal("trace id should not be empty")
