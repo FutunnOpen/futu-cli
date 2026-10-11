@@ -8,6 +8,10 @@
   "scripts": {
     "postinstall": "node npm/scripts/install.js"
   },
+  "engines": {
+    "node": ">=18",
+    "npm": ">=9"
+  },
   "files": [
     "npm/bin",
     "npm/scripts",
