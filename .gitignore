@@ -1,4 +1,5 @@
 .local_docs/
+.idea/
 /skills/
 /npm/vendor/
 /dist/
