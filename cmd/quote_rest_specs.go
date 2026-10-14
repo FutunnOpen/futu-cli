@@ -1273,6 +1273,7 @@ var quoteRESTSpecs = []quoteRESTSpec{
 		Params: []quoteRESTParam{
 			{
 				Name:     "symbol",
+				CLIName:  "keyword",
 				Kind:     "string",
 				Required: true,
 				Default:  "00700",
@@ -1318,6 +1319,7 @@ var quoteRESTSpecs = []quoteRESTSpec{
 		Params: []quoteRESTParam{
 			{
 				Name:     "symbol",
+				CLIName:  "keyword",
 				Kind:     "string",
 				Required: true,
 				Default:  "00700",
@@ -1361,6 +1363,7 @@ var quoteRESTSpecs = []quoteRESTSpec{
 		Params: []quoteRESTParam{
 			{
 				Name:     "symbol",
+				CLIName:  "keyword",
 				Kind:     "string",
 				Required: true,
 				Default:  "00700",

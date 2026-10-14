@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -72,6 +73,35 @@ func TestQuoteRESTAggregateSelectsVariantSpec(t *testing.T) {
 	}
 }
 
+func TestSearchAggregateUsesKeywordFlagForSymbolQuery(t *testing.T) {
+	specs := loadQuoteRESTSpecs()
+	specByCmd := make(map[string]*quoteRESTSpec, len(specs))
+	for i := range specs {
+		specByCmd[specs[i].Cmd] = &specs[i]
+	}
+	var searchAggregate quoteRESTAggregate
+	for _, aggregate := range quoteRESTAggregates {
+		if aggregate.Cmd == "search" {
+			searchAggregate = aggregate
+			break
+		}
+	}
+	command := newQuoteRESTAggregateCommand(searchAggregate, specByCmd)
+	if command == nil {
+		t.Fatal("search aggregate command was nil")
+	}
+	if command.Flags().Lookup("symbol") != nil {
+		t.Fatal("search command should not expose --symbol")
+	}
+	flag := command.Flags().Lookup("keyword")
+	if flag == nil {
+		t.Fatal("search command should expose --keyword")
+	}
+	if !strings.Contains(flag.Usage, "keyword") || strings.Contains(flag.Usage, "MARKET.CODE") {
+		t.Fatalf("keyword usage = %q", flag.Usage)
+	}
+}
+
 func TestReadRESTFlagUsesSpecDefaultWithEmptyCommandDefault(t *testing.T) {
 	command := &cobra.Command{}
 	command.Flags().Int("limit", 0, "")
@@ -86,6 +116,20 @@ func TestReadRESTFlagUsesSpecDefaultWithEmptyCommandDefault(t *testing.T) {
 	}
 	if !ok || got != 30 {
 		t.Fatalf("limit = %#v, ok=%v; want 30", got, ok)
+	}
+}
+
+func TestCLINameSymbolParamDoesNotNormalizeAsMarketCode(t *testing.T) {
+	got, ok, err := parseRESTFlagString("keyword", quoteRESTParam{
+		Name:    "symbol",
+		CLIName: "keyword",
+		Kind:    "string",
+	}, "腾讯")
+	if err != nil {
+		t.Fatalf("parseRESTFlagString() error = %v", err)
+	}
+	if !ok || got != "腾讯" {
+		t.Fatalf("keyword = %#v, ok=%v; want 腾讯", got, ok)
 	}
 }
 

@@ -178,7 +178,7 @@ Most commands support `--format json` for JSON output and `--format table` (defa
 | `futu option-data <symbol>` | Query option expiration, strategy, spread, exercise probability, or volatility data |
 | `futu plate [symbol]` | Query plate lists, plate stocks, or owner plates |
 | `futu research <symbol>` | Query analyst consensus, Morningstar reports, or rating summaries |
-| `futu search [keyword]` | Search news, community posts, or stock feeds |
+| `futu search [keyword]` | Search news, community posts, or stock feeds by keyword; also accepts `--keyword` |
 | `futu shareholders <symbol>` | Query shareholder overview, institutional holders, holding changes, and insider data |
 | `futu short <symbol>` | Query short volume or short interest |
 | `futu valuation [symbol]` | Query valuation detail, plate stocks, index stocks, or index plates |
@@ -198,6 +198,7 @@ Examples:
 futu quote HK.00700 US.AAPL --format json
 futu kline US.AAPL --ktype 1 --format json
 futu capital HK.00700 --view history --period-type WEEK --format json
+futu search AAPL --type community --format json
 futu plate --view list --market HK --plate-class INDUSTRY --format json
 futu trading-days --market US --start 2026-10-01 --end 2026-10-31 --format json
 ```
