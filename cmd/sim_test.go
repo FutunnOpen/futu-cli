@@ -1,6 +1,9 @@
 package cmd
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestSimCommandRegistration(t *testing.T) {
 	for _, args := range [][]string{
@@ -116,6 +119,45 @@ func TestBuildSimPlaceOrderBodyRejectsInvalidQuantity(t *testing.T) {
 
 	if _, err := buildSimPlaceOrderBody("US.AAPL", "0", orderSideBuy); err == nil {
 		t.Fatal("expected invalid quantity error")
+	}
+}
+
+func TestApplySimModifyBodyRequiresQuantityAndPrice(t *testing.T) {
+	oldFlags := simFlags
+	defer func() { simFlags = oldFlags }()
+
+	tests := []struct {
+		name       string
+		quantity   string
+		price      string
+		wantErrMsg string
+	}{
+		{name: "missing quantity", price: "181", wantErrMsg: errSimModifyQuantityReq},
+		{name: "missing price", quantity: "2", wantErrMsg: errSimModifyPriceReq},
+		{name: "quantity and price", quantity: "2", price: "181"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			simFlags = oldFlags
+			simFlags.quantity = test.quantity
+			simFlags.price = test.price
+			body := map[string]any{}
+
+			err := applySimModifyBody(body)
+			if test.wantErrMsg != "" {
+				if err == nil || !strings.Contains(err.Error(), test.wantErrMsg) {
+					t.Fatalf("applySimModifyBody() error = %v, want %q", err, test.wantErrMsg)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("applySimModifyBody() error = %v", err)
+			}
+			if body[simFieldNewQuantity] != test.quantity || body[simFieldNewPrice] != test.price {
+				t.Fatalf("modify body = %#v", body)
+			}
+		})
 	}
 }
 

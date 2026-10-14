@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"net/url"
@@ -64,6 +65,8 @@ const (
 	simTradeTimeTypeExtended  = 2
 	simQuantityParseBitSize   = 64
 	simQuantityParseBase      = 10
+	errSimModifyQuantityReq   = "--qty is required when modifying simulated orders"
+	errSimModifyPriceReq      = "--price is required when modifying simulated orders"
 )
 
 var simFlags struct {
@@ -164,7 +167,7 @@ var simOrderHistoryCmd = &cobra.Command{
 
 var simOrderModifyCmd = &cobra.Command{
 	Use:   "modify <order-id>",
-	Short: "Modify a simulated order",
+	Short: "Modify a simulated order with required quantity and price",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runSimModifyOrder,
 }
@@ -236,8 +239,10 @@ func registerSimHistoryFlags(cmd *cobra.Command) {
 
 func registerSimModifyFlags(cmd *cobra.Command) {
 	registerSimMarketFlags(cmd)
-	cmd.Flags().StringVar(&simFlags.quantity, "qty", "", "New order quantity (default: unchanged)")
-	cmd.Flags().StringVar(&simFlags.price, "price", "", "New order price string (default: unchanged)")
+	cmd.Flags().StringVar(&simFlags.quantity, "qty", "", "New order quantity (required)")
+	cmd.Flags().StringVar(&simFlags.price, "price", "", "New order price string (required)")
+	_ = cmd.MarkFlagRequired("qty")
+	_ = cmd.MarkFlagRequired("price")
 }
 
 func registerSimMaxQtyFlags(cmd *cobra.Command) {
@@ -455,23 +460,23 @@ func applySimSession(body map[string]any) (map[string]any, error) {
 }
 
 func applySimModifyBody(body map[string]any) error {
-	if strings.TrimSpace(simFlags.quantity) != "" {
-		qty, err := parsePositiveSimQuantity(simFlags.quantity)
-		if err != nil {
-			return err
-		}
-		body[simFieldNewQuantity] = qty
+	if strings.TrimSpace(simFlags.quantity) == "" {
+		return errors.New(errSimModifyQuantityReq)
 	}
+	qty, err := parsePositiveSimQuantity(simFlags.quantity)
+	if err != nil {
+		return err
+	}
+	body[simFieldNewQuantity] = qty
+
 	price, err := normalizePriceString(simFlags.price)
 	if err != nil {
 		return fmt.Errorf("invalid price: %w", err)
 	}
-	if price != "" {
-		body[simFieldNewPrice] = price
+	if price == "" {
+		return errors.New(errSimModifyPriceReq)
 	}
-	if _, ok := body[simFieldNewQuantity]; !ok && price == "" {
-		return fmt.Errorf("at least one of --qty or --price is required")
-	}
+	body[simFieldNewPrice] = price
 	return nil
 }
 

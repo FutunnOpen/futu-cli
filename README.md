@@ -236,7 +236,7 @@ Simulated trading commands are grouped under `futu sim`. If `--account` is omitt
 | `futu sim order buy <symbol> <qty>` | Place a simulated buy order |
 | `futu sim order sell <symbol> <qty>` | Place a simulated sell order |
 | `futu sim order place <qty>` | Place a generic simulated order; direction via `--side` and symbol via `--symbol` |
-| `futu sim order modify <order-id>` | Modify simulated order quantity and/or price |
+| `futu sim order modify <order-id>` | Modify simulated order; requires both `--qty` and `--price` |
 | `futu sim order cancel <order-id>` | Cancel a simulated order |
 
 Examples:
