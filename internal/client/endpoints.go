@@ -23,8 +23,6 @@ var Endpoints = map[string]Endpoint{
 	"quote.stock_basicinfo": {Method: http.MethodPost, Path: "/api/v1.0/quote/stock-basicinfo"},
 	"quote.option_chain":    {Method: http.MethodGet, Path: "/api/v1.0/quote/{symbol}/option-chain"},
 	// ── Quote REST (generated from bff_gateway_svr) ──
-	"news.source_latest":                         {Method: http.MethodGet, Path: "/api/v1.0/news/source-latest"},
-	"news.detail":                                {Method: http.MethodGet, Path: "/api/v1.0/news/detail"},
 	"quote.owner_plate":                          {Method: http.MethodGet, Path: "/api/v1.0/quote/{symbol}/owner-plate"},
 	"quote.top_ten_brokers":                      {Method: http.MethodGet, Path: "/api/v1.0/quote/{symbol}/top-brokers"},
 	"quote.top_ten_brokers_history":              {Method: http.MethodGet, Path: "/api/v1.0/quote/{symbol}/top-brokers-history"},

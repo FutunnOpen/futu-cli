@@ -559,9 +559,6 @@ func quoteRESTUsage(p quoteRESTParam) string {
 }
 
 func quoteRESTShort(spec *quoteRESTSpec) string {
-	if spec.Group == newsGroupID {
-		return "Call a news REST endpoint"
-	}
 	if spec.Group == simGroupID {
 		return "Call a simulated-trading REST endpoint"
 	}
@@ -636,9 +633,6 @@ func runQuoteREST(cmd *cobra.Command, args []string, spec *quoteRESTSpec) error 
 		fieldParam := quoteRESTParam{Name: field, Kind: "string", Source: "query"}
 		if field == "keyword" {
 			keyword = "CPI"
-		}
-		if field == "news_ids" {
-			keyword = ""
 		}
 		for _, p := range spec.Params {
 			if p.Name != field {
@@ -740,14 +734,6 @@ func runQuoteREST(cmd *cobra.Command, args []string, spec *quoteRESTSpec) error 
 		}
 	}
 
-	if spec.ID == "news.detail" && query.Get("news_ids") == "" {
-		id, err := firstNewsID(cmd)
-		if err != nil {
-			return err
-		}
-		query.Set("news_ids", id)
-	}
-
 	if spec.ID == "quote.warrant_screen" {
 		applyWarrantPageDefault(cmd, body)
 	}
@@ -813,25 +799,6 @@ func firstSimAccountID(cmd *cobra.Command) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("no simulated account found; pass --acc-id")
-}
-
-func firstNewsID(cmd *cobra.Command) (string, error) {
-	query := url.Values{}
-	query.Set("source_ids", "12")
-	result, err := quoteSvc.Call(cmdContext(cmd), "news.source_latest", client.CallOpts{Params: query})
-	if err != nil {
-		return "", fmt.Errorf("auto-fetching news ID failed; pass news_ids: %w", err)
-	}
-	items := extractObjectList(decodeJSONValue(result.Data), "news_list")
-	if len(items) == 0 {
-		items = extractObjectList(decodeJSONValue(result.Data), "")
-	}
-	for _, item := range items {
-		if id := jsonString(item, "news_id"); id != "" {
-			return id, nil
-		}
-	}
-	return "", fmt.Errorf("news list is empty; pass news_ids, for example post:21670914")
 }
 
 func firstExecutiveName(cmd *cobra.Command, code string) (string, error) {

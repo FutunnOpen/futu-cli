@@ -37,6 +37,14 @@ func TestQuoteRESTAggregateCommandsReplaceFlatQuoteCommands(t *testing.T) {
 	}
 }
 
+func TestNewsRESTCommandsAreNotRegistered(t *testing.T) {
+	for _, name := range []string{"news-detail", "news-source-latest"} {
+		if _, _, err := rootCmd.Find([]string{name}); err == nil {
+			t.Fatalf("unsupported news command %q is registered", name)
+		}
+	}
+}
+
 func TestQuoteRESTAggregateSelectsVariantSpec(t *testing.T) {
 	specs := loadQuoteRESTSpecs()
 	specByCmd := make(map[string]*quoteRESTSpec, len(specs))

@@ -110,7 +110,6 @@ var noConfigCommands = map[string]bool{
 
 const quoteGroupID = "quote"
 const simGroupID = "sim"
-const newsGroupID = "news"
 
 var rootCmd = &cobra.Command{
 	Use:   "futu",
@@ -141,7 +140,6 @@ func Execute() error {
 func init() {
 	rootCmd.AddGroup(&cobra.Group{ID: quoteGroupID, Title: "Quote Commands:"})
 	rootCmd.AddGroup(&cobra.Group{ID: simGroupID, Title: "Sim Trade Commands:"})
-	rootCmd.AddGroup(&cobra.Group{ID: newsGroupID, Title: "News Commands:"})
 	rootCmd.PersistentFlags().StringVarP(&outputFormat, "format", "f", formatTable,
 		"Output format: table or json (default: table)")
 	rootCmd.PersistentFlags().StringVar(&tokenFile, "token-file", "",

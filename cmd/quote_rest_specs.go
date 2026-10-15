@@ -3,43 +3,6 @@ package cmd
 // quoteRESTSpecs contains the compact endpoint metadata needed by the dynamic quote commands.
 var quoteRESTSpecs = []quoteRESTSpec{
 	{
-		ID:         "news.source_latest",
-		Cmd:        "news-source-latest",
-		Group:      "news",
-		Path:       "/api/v1.0/news/source-latest",
-		Method:     "GET",
-		Wrap:       "news_list",
-		Positional: "keyword",
-		Extra:      "source_ids",
-		Params: []quoteRESTParam{
-			{
-				Name:     "source_ids",
-				Kind:     "string",
-				Required: true,
-				Default:  "12",
-				Source:   "query",
-			},
-		},
-	},
-	{
-		ID:         "news.detail",
-		Cmd:        "news-detail",
-		Group:      "news",
-		Path:       "/api/v1.0/news/detail",
-		Method:     "GET",
-		Wrap:       "news_list",
-		Positional: "keyword",
-		Extra:      "news_ids",
-		Params: []quoteRESTParam{
-			{
-				Name:     "news_ids",
-				Kind:     "string",
-				Required: true,
-				Source:   "query",
-			},
-		},
-	},
-	{
 		ID:         "quote.owner_plate",
 		Cmd:        "owner-plate",
 		Group:      "quote",
