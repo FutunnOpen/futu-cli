@@ -1,8 +1,11 @@
 package cmd
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/futunn/futu/internal/service"
 )
 
 func TestSimCommandRegistration(t *testing.T) {
@@ -164,5 +167,40 @@ func TestApplySimModifyBodyRequiresQuantityAndPrice(t *testing.T) {
 func TestParsePositiveSimQuantityRejectsNaN(t *testing.T) {
 	if _, err := parsePositiveSimQuantity("NaN"); err == nil {
 		t.Fatal("expected invalid NaN quantity error")
+	}
+}
+
+func TestValidateSimOrderResultRejectsZeroOrderID(t *testing.T) {
+	result := &service.BFFResult{Data: json.RawMessage(`{"order_id":"0"}`)}
+	if _, err := validateSimOrderResult(simEndpointInputOrder, result); err == nil {
+		t.Fatal("expected invalid order_id error")
+	}
+}
+
+func TestValidateSimOrderResultAcceptsNonZeroOrderID(t *testing.T) {
+	result := &service.BFFResult{Data: json.RawMessage(`{"order_id":"12345"}`)}
+	got, err := validateSimOrderResult(simEndpointInputOrder, result)
+	if err != nil {
+		t.Fatalf("validateSimOrderResult() error = %v", err)
+	}
+	if got != "12345" {
+		t.Fatalf("order_id = %q, want 12345", got)
+	}
+}
+
+func TestSimOrderListContainsOrderID(t *testing.T) {
+	result := &service.BFFResult{Data: json.RawMessage(`{"orders":[{"order_id":"12345"}]}`)}
+	if !simOrderListContains(result, "12345") {
+		t.Fatal("expected order list to contain order_id")
+	}
+	if simOrderListContains(result, "99999") {
+		t.Fatal("unexpected order_id match")
+	}
+}
+
+func TestSimOrderListContainsTopLevelOrderArray(t *testing.T) {
+	result := &service.BFFResult{Data: json.RawMessage(`[{"order_id":"12345"}]`)}
+	if !simOrderListContains(result, "12345") {
+		t.Fatal("expected top-level order array to contain order_id")
 	}
 }

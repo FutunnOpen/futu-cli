@@ -9,6 +9,7 @@ func TestParse_FutuAndMarketCode(t *testing.T) {
 		{"HK.00700", "00700", "HK", "HK.00700"},
 		{"HK.700", "00700", "HK", "HK.00700"},
 		{"US.AAPL", "AAPL", "US", "US.AAPL"},
+		{"US.BRK.B", "BRK.B", "US", "US.BRK.B"},
 		{"us.aapl", "AAPL", "US", "US.AAPL"},
 		{"SG.D05", "D05", "SG", "SG.D05"},
 		{"CC.BTC", "BTC", "CC", "CC.BTC"},

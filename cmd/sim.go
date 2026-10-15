@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/futunn/futu/internal/client"
+	"github.com/futunn/futu/internal/service"
 	"github.com/futunn/futu/pkg/symbol"
 )
 
@@ -65,6 +66,7 @@ const (
 	simTradeTimeTypeExtended  = 2
 	simQuantityParseBitSize   = 64
 	simQuantityParseBase      = 10
+	simInvalidOrderID         = "0"
 	errSimModifyQuantityReq   = "--qty is required when modifying simulated orders"
 	errSimModifyPriceReq      = "--price is required when modifying simulated orders"
 )
@@ -298,7 +300,15 @@ func runSimPlaceOrder(cmd *cobra.Command, rawSymbol, rawQty, side string) error 
 	if err != nil {
 		return err
 	}
-	return callSimEndpoint(cmd, simEndpointInputOrder, "", opts)
+	result, err := callSimEndpointResult(cmd, simEndpointInputOrder, opts)
+	if err != nil {
+		return err
+	}
+	if _, err := validateSimOrderResult(simEndpointInputOrder, result); err != nil {
+		return err
+	}
+	printSimEndpointResult(result, "")
+	return nil
 }
 
 func runSimModifyOrder(cmd *cobra.Command, args []string) error {
@@ -306,7 +316,19 @@ func runSimModifyOrder(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	return callSimEndpoint(cmd, simEndpointModifyOrder, "", opts)
+	result, err := callSimEndpointResult(cmd, simEndpointModifyOrder, opts)
+	if err != nil {
+		return err
+	}
+	orderID, err := validateSimOrderResult(simEndpointModifyOrder, result)
+	if err != nil {
+		return err
+	}
+	if err := verifySimOrderPresent(cmd, orderID); err != nil {
+		return err
+	}
+	printSimEndpointResult(result, "")
+	return nil
 }
 
 func runSimCancelOrder(cmd *cobra.Command, args []string) error {
@@ -532,14 +554,69 @@ func resolveSimAccount(cmd *cobra.Command) (string, error) {
 }
 
 func callSimEndpoint(cmd *cobra.Command, id, wrap string, opts client.CallOpts) error {
+	result, err := callSimEndpointResult(cmd, id, opts)
+	if err != nil {
+		return err
+	}
+	printSimEndpointResult(result, wrap)
+	return nil
+}
+
+func callSimEndpointResult(cmd *cobra.Command, id string, opts client.CallOpts) (*service.BFFResult, error) {
 	result, err := quoteSvc.Call(cmdContext(cmd), id, opts)
 	if err != nil {
-		return fmt.Errorf("calling %s: %w", id, err)
+		return nil, fmt.Errorf("calling %s: %w", id, err)
 	}
+	return result, nil
+}
+
+func printSimEndpointResult(result *service.BFFResult, wrap string) {
 	printBFFResult(result, func() {
 		renderQuoteRESTTable(decodeJSONValue(result.Data), wrap)
 	})
-	return nil
+}
+
+func validateSimOrderResult(endpoint string, result *service.BFFResult) (string, error) {
+	orderID := strings.TrimSpace(jsonString(simOrderResultObject(result), simFieldOrderID))
+	if orderID == "" || orderID == simInvalidOrderID {
+		return "", fmt.Errorf("%s returned invalid %s %q; order may not have been submitted",
+			endpoint, simFieldOrderID, orderID)
+	}
+	return orderID, nil
+}
+
+func simOrderResultObject(result *service.BFFResult) map[string]any {
+	object, _ := decodeJSONValue(result.Data).(map[string]any)
+	return object
+}
+
+func verifySimOrderPresent(cmd *cobra.Command, orderID string) error {
+	opts, err := simQueryOpts(cmd)
+	if err != nil {
+		return err
+	}
+	result, err := callSimEndpointResult(cmd, simEndpointOrderList, opts)
+	if err != nil {
+		return err
+	}
+	if simOrderListContains(result, orderID) {
+		return nil
+	}
+	return fmt.Errorf("simulated order %s was not found after modify; order may not have been modified", orderID)
+}
+
+func simOrderListContains(result *service.BFFResult, orderID string) bool {
+	data := decodeJSONValue(result.Data)
+	orders := jsonObjectList(data, simWrapOrders)
+	if len(orders) == 0 {
+		orders = jsonObjectList(data, "")
+	}
+	for _, order := range orders {
+		if strings.TrimSpace(jsonString(order, simFieldOrderID)) == orderID {
+			return true
+		}
+	}
+	return false
 }
 
 func parseSimOrderIdentity(rawSymbol, rawQty string) (string, string, error) {

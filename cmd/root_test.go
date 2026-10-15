@@ -44,6 +44,24 @@ func TestFormatVersionUsesFutuBinaryName(t *testing.T) {
 	}
 }
 
+func TestNormalizeOutputFormat(t *testing.T) {
+	previous := outputFormat
+	t.Cleanup(func() { outputFormat = previous })
+
+	outputFormat = "JSON"
+	if err := normalizeOutputFormat(); err != nil {
+		t.Fatalf("normalizeOutputFormat() error = %v", err)
+	}
+	if outputFormat != formatJSON {
+		t.Fatalf("outputFormat = %q, want %q", outputFormat, formatJSON)
+	}
+
+	outputFormat = "josn"
+	if err := normalizeOutputFormat(); err == nil {
+		t.Fatal("expected invalid output format error")
+	}
+}
+
 func TestReportSourceHeaderValueForFutu(t *testing.T) {
 	previous := reportSourceMode
 	t.Cleanup(func() { reportSourceMode = previous })

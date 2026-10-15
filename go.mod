@@ -1,6 +1,6 @@
 module github.com/futunn/futu
 
-go 1.22
+go 1.27.2
 
 require (
 	github.com/spf13/cobra v1.8.1

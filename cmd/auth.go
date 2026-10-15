@@ -511,7 +511,10 @@ func runStatus(_ *cobra.Command, _ []string) error {
 	path := effectiveTokenFile()
 	store, err := auth.LoadToken(path)
 	if err != nil {
-		return printAuthStatus(newAuthStatus(nil, path))
+		if err := printAuthStatus(newAuthStatus(nil, path)); err != nil {
+			return err
+		}
+		return fmt.Errorf("%s", statusNotLoggedIn)
 	}
 	store, err = refreshTokenIfExpired(path, store)
 	if err != nil {

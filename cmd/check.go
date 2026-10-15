@@ -68,6 +68,9 @@ func runCheck(_ *cobra.Command, _ []string) error {
 		Connectivity: connectivityCheck{API: <-connectivityCh},
 	}
 	printResult(result, func() { renderCheckTable(result) })
+	if result.Session.Token != tokenValid {
+		return fmt.Errorf("token %s", result.Session.Token)
+	}
 	return nil
 }
 
