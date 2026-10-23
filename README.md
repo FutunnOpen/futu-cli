@@ -137,6 +137,12 @@ auto_update
 
 `client_id` is bound to both `client_id_api_base` and `client_id_oauth_base`. If either binding is missing or does not match the current `api_base`, `futu auth login` registers and saves a new `client_id` instead of reusing the old one.
 
+## Telemetry
+
+Each API call is reported to `https://ai-report.futunn.com` so a failed or slow command can be traced back to your account without asking you to copy logs. The report is sent with the same OAuth access token as the call, which lets support match it to the session that just ran, see whether the CLI or an agent sent an invalid request, and tell you if your installed version is out of date.
+
+A report includes the command name, HTTP method, API path, status code, duration, CLI version, operating system, architecture, agent name, and the sanitized request and response. Token, password, and secret fields are removed. Securities, account, and crypto trading payloads are masked. Quote and other calls keep the remaining request and response fields, including order IDs, so a specific request can be identified when you ask for help. There is no setting to turn reporting off.
+
 ## Commands
 
 Most commands support `--format json` for JSON output and `--format table` (default) for tabular output. Commands that interact with an account accept `--account <account-id>`; use `futu account list` to find the ID. Securities quote/trading symbols use `MARKET.CODE`, for example `US.AAPL` or `HK.00700`; crypto symbols keep their pair format, for example `BTCUSD`.
@@ -205,22 +211,32 @@ futu trading-days --market US --start 2026-10-01 --end 2026-10-31 --format json
 
 ### Trading
 
+Securities and crypto order writes default to dry-run. The first call validates and previews the request, returns a three-digit confirmation code, and does not submit. Re-run the same command with `--execute <code>` to place, modify, or cancel.
+
 | Command | Description |
 |---------|-------------|
 | `futu account list` | List authorized trading accounts; the Account ID is used as `--account` |
 | `futu account funds` | Query account funds (total assets, cash, market value, buying power, P/L, risk status) |
 | `futu position` | List positions; filter by `--symbol US.AAPL` or P/L ratio |
-| `futu order buy <symbol> <qty>` | Place a buy order (market/limit/stop/limit_if_touched); confirms before submission |
-| `futu order sell <symbol> <qty>` | Place a sell order; same parameters as `order buy` |
-| `futu order place <qty>` | Submit a generic securities order (SELL_SHORT, BUY_BACK, conditional, multi-leg) |
-| `futu order modify <order-id>` | Modify order qty/price/trigger; requires `--exchange`; confirms before submission |
-| `futu order cancel <order-id>` | Cancel an order; requires `--exchange`; confirms before submission |
+| `futu order buy <symbol> <qty>` | Preview a buy order (market/limit/stop/limit_if_touched); submit with `--execute` |
+| `futu order sell <symbol> <qty>` | Preview a sell order; submit with `--execute` |
+| `futu order place <qty>` | Preview a generic securities order (SELL_SHORT, BUY_BACK, conditional, multi-leg) |
+| `futu order modify <order-id>` | Preview order qty/price/trigger changes; requires `--exchange`; submit with `--execute` |
+| `futu order cancel <order-id>` | Preview cancel; requires `--exchange`; submit with `--execute` |
 | `futu order list` | List open orders; supports `--market` and `--page-size` |
 | `futu order history` | List historical orders; supports `--market`, `--symbol US.AAPL`, `--start`/`--end` (microseconds) |
 | `futu order detail <order-id> [order-id...]` | Batch query order details; up to 100 IDs; requires `--exchange` |
 | `futu order max-qty <symbol>` | Query max buy/sell/sell-short/buy-back quantities and margin requirements |
 | `futu deal` | List today's filled trades |
 | `futu deal history` | List historical filled trades; supports `--market`, `--symbol US.AAPL`, `--start`/`--end` (microseconds) |
+
+Examples:
+
+```bash
+futu order buy US.AAPL 1 --type limit --price 180
+futu order buy US.AAPL 1 --type limit --price 180 --execute <confirmation_code>
+futu order cancel <order-id> --exchange US --execute <confirmation_code>
+```
 
 ### Simulated Trading
 
@@ -259,11 +275,11 @@ futu sim order cancel <order-id> --market US --format json
 | `futu crypto account list` | List accounts authorized for crypto trading |
 | `futu crypto balance` | Query crypto account total balance (cash + digital assets) |
 | `futu crypto max-qty <symbol>` | Query max cash buy quantity, max sell quantity, and max cash buy amount |
-| `futu crypto order place <symbol>` | Place a crypto order; direction via `--side`; supports `--qty` or `--cash-qty` |
-| `futu crypto order buy <symbol>` | Place a crypto buy order; supports `--qty` or `--cash-qty` (amount-based market buy) |
-| `futu crypto order sell <symbol>` | Place a crypto sell order; `--cash-qty` not supported |
-| `futu crypto order modify <order-id>` | Modify price/qty/conditional info; requires `--order-version` from order detail |
-| `futu crypto order cancel <order-id>` | Cancel a crypto order |
+| `futu crypto order place <symbol>` | Preview a crypto order; direction via `--side`; supports `--qty` or `--cash-qty`; submit with `--execute` |
+| `futu crypto order buy <symbol>` | Preview a crypto buy order; supports `--qty` or `--cash-qty`; submit with `--execute` |
+| `futu crypto order sell <symbol>` | Preview a crypto sell order; `--cash-qty` not supported; submit with `--execute` |
+| `futu crypto order modify <order-id>` | Preview price/qty/conditional changes; requires `--order-version`; submit with `--execute` |
+| `futu crypto order cancel <order-id>` | Preview cancel; submit with `--execute` |
 | `futu crypto order list` | List open crypto orders; supports `--page-size` and `--page-flag` |
 | `futu crypto order history` | List historical crypto orders; defaults to last 3 months; supports `--symbol`/`--start`/`--end` |
 | `futu crypto order detail <order-id> [order-id...]` | Batch query crypto order details; up to 20 IDs |
@@ -274,7 +290,7 @@ futu sim order cancel <order-id> --market US --format json
 
 Official releases are published from GitHub Actions. The release tag, GitHub Release, binary version, and asset names must use the same version, for example `v0.1.0`.
 
-Each release includes platform archives and one checksum file:
+Each release includes platform archives, a checksum file, and an ECDSA signature over the checksum file:
 
 ```text
 futu_v0.1.0_darwin_amd64.tar.gz
@@ -285,7 +301,10 @@ futu_v0.1.0_linux_musl_amd64.tar.gz
 futu_v0.1.0_linux_musl_arm64.tar.gz
 futu_v0.1.0_windows_amd64.zip
 futu_checksums.txt
+futu_checksums.txt.sig
 ```
+
+Installers and `futu update` verify `futu_checksums.txt.sig` with the embedded release public key before trusting checksums or replacing the binary. Archives also include a `VERSION` file that is checked without executing the downloaded binary.
 
 ## Development
 

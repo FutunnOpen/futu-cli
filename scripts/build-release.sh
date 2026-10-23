@@ -4,8 +4,10 @@ set -euo pipefail
 PRODUCT="futu"
 BINARY="futu"
 CHECKSUMS_ASSET="futu_checksums.txt"
+VERSION_FILE="VERSION"
 OUTPUT_DIR="${OUTPUT_DIR:-dist}"
 VERSION="${1:-${FUTU_CLI_VERSION:-}}"
+SIGN_SCRIPT="$(cd "$(dirname "$0")" && pwd)/sign-release.sh"
 
 if [[ -z "$VERSION" ]]; then
   echo "usage: $0 vMAJOR.MINOR.PATCH[-PRERELEASE]" >&2
@@ -31,6 +33,7 @@ mkdir -p "$OUTPUT_DIR"
 copy_release_files() {
   local package_dir="$1"
 
+  printf '%s\n' "$VERSION" >"$package_dir/$VERSION_FILE"
   cp README.md "$package_dir/README.md"
   if [[ -f LICENSE ]]; then
     cp LICENSE "$package_dir/LICENSE"
@@ -105,5 +108,11 @@ build_package linux arm64 linux_musl_arm64 tar.gz
 build_package windows amd64 windows_amd64 zip
 
 write_checksums
+
+if [[ -n "${FUTU_CLI_RELEASE_SIGNING_KEY:-}" || -n "${FUTU_CLI_RELEASE_SIGNING_KEY_FILE:-}" ]]; then
+  "$SIGN_SCRIPT" "$OUTPUT_DIR/$CHECKSUMS_ASSET"
+else
+  echo "warning: checksum signature not written; set FUTU_CLI_RELEASE_SIGNING_KEY or FUTU_CLI_RELEASE_SIGNING_KEY_FILE before publishing" >&2
+fi
 
 echo "release assets written to $OUTPUT_DIR"

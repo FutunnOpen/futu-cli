@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { createHash } = require("node:crypto");
+const { createHash, createPublicKey, verify } = require("node:crypto");
 const { chmodSync, copyFileSync, createWriteStream, mkdirSync, readFileSync, rmSync } = require("node:fs");
 const { get } = require("node:https");
 const { get: getHTTP } = require("node:http");
@@ -12,10 +12,17 @@ const product = "futu";
 const binary = "futu";
 const envPrefix = "FUTU_CLI";
 const checksumAsset = "futu_checksums.txt";
+const checksumSignatureAsset = "futu_checksums.txt.sig";
+const versionFile = "VERSION";
 const packageJson = require("../../package.json");
 const defaultReleaseBase = "https://github.com/FutunnOpen/futu-cli";
 const releaseBase = (process.env[`${envPrefix}_RELEASE_BASE`] || defaultReleaseBase).replace(/\/+$/, "");
 const version = process.env[`${envPrefix}_VERSION`] || `v${packageJson.version}`;
+const releasePublicKeyPem = `-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyk556CXX05/DwVDZl9lJIt74Vut5
++4Fj6BuwyUATzxXDI5O3GohEhC3X3m0ygsH/p3ClarvAUwfmRF+1DfEkWQ==
+-----END PUBLIC KEY-----
+`;
 
 function platformSuffix() {
   const arch = process.arch === "x64" ? "amd64" : process.arch;
@@ -47,7 +54,6 @@ function download(url, destination) {
       const file = createWriteStream(destination);
       response.pipe(file);
       file.on("finish", () => file.close(resolve));
-      file.on("error", reject);
     }).on("error", reject);
   });
 }
@@ -56,12 +62,26 @@ function checksum(path) {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
 
+function verifyChecksumSignature(checksumsPath, signaturePath) {
+  const key = createPublicKey(releasePublicKeyPem);
+  const ok = verify(
+    "sha256",
+    readFileSync(checksumsPath),
+    key,
+    readFileSync(signaturePath),
+  );
+  if (!ok) {
+    throw new Error("checksum signature verification failed");
+  }
+}
+
 async function main() {
   const selected = platformSuffix();
   const asset = `${binary}_${version}_${selected.suffix}.${selected.ext}`;
   const workDir = join(tmpdir(), `${product}-npm-${Date.now()}`);
   const archive = join(workDir, asset);
   const checksumFile = join(workDir, checksumAsset);
+  const signatureFile = join(workDir, checksumSignatureAsset);
   const unpackDir = join(workDir, "unpack");
   const vendorDir = join(__dirname, "..", "vendor");
 
@@ -72,6 +92,8 @@ async function main() {
   try {
     await download(`${releaseBase}/releases/download/${version}/${asset}`, archive);
     await download(`${releaseBase}/releases/download/${version}/${checksumAsset}`, checksumFile);
+    await download(`${releaseBase}/releases/download/${version}/${checksumSignatureAsset}`, signatureFile);
+    verifyChecksumSignature(checksumFile, signatureFile);
     const line = readFileSync(checksumFile, "utf8").split(/\r?\n/).find((item) => item.trim().endsWith(` ${asset}`));
     if (!line) throw new Error(`checksum for ${asset} not found`);
     const expected = line.trim().split(/\s+/)[0].toLowerCase();
@@ -85,14 +107,13 @@ async function main() {
 
     const exe = process.platform === "win32" ? `${binary}.exe` : binary;
     const source = join(unpackDir, exe);
+    const packageVersion = readFileSync(join(unpackDir, versionFile), "utf8").trim();
+    if (packageVersion !== version) {
+      throw new Error(`package ${versionFile} is ${packageVersion}, want ${version}`);
+    }
     const target = join(vendorDir, exe);
     copyFileSync(source, target);
     if (process.platform !== "win32") chmodSync(target, 0o755);
-    const verify = spawnSync(target, ["version"], { encoding: "utf8" });
-    if (verify.status !== 0) throw new Error(`failed to verify ${exe}`);
-    if (!`${verify.stdout}${verify.stderr}`.includes(version)) {
-      throw new Error(`${exe} version output does not contain ${version}`);
-    }
   } finally {
     rmSync(workDir, { recursive: true, force: true });
   }

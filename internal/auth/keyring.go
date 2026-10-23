@@ -12,18 +12,20 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"sync"
 
 	"github.com/zalando/go-keyring"
 )
 
 const (
-	tokenFilePermissions  = 0o600
-	tokenDirPermissions   = 0o700
-	temporaryTokenPattern = ".futu-token-*"
-	keyringService        = "futu-cli"
-	keyringUser           = "default"
-	encryptionKeyUser     = "token-encryption-key"
-	encryptionKeySize     = 32
+	tokenFilePermissions      = 0o600
+	tokenDirPermissions       = 0o700
+	temporaryTokenPattern     = ".futu-token-*"
+	keyringService            = "futu-cli"
+	keyringUser               = "default"
+	encryptionKeyUser         = "token-encryption-key"
+	encryptionKeySize         = 32
+	machineKeyFallbackWarning = "Warning: the system keyring is unavailable. The login token is encrypted with a key derived from this computer's hostname and username. Anyone who can read the token file and knows those values can decrypt it. Sign in again after a keyring is available to store a stronger key."
 )
 
 // LoadFromKeyring reads a token created by older CLI versions.
@@ -113,7 +115,7 @@ func getOrCreateEncryptionKey() ([]byte, error) {
 		return key, nil
 	}
 	if !errors.Is(err, keyring.ErrNotFound) {
-		return deriveMachineKey(), nil
+		return fallbackMachineKey(), nil
 	}
 	key = make([]byte, encryptionKeySize)
 	if _, err := rand.Read(key); err != nil {
@@ -121,9 +123,18 @@ func getOrCreateEncryptionKey() ([]byte, error) {
 	}
 	encoded := base64.RawStdEncoding.EncodeToString(key)
 	if err := keyring.Set(keyringService, encryptionKeyUser, encoded); err != nil {
-		return deriveMachineKey(), nil
+		return fallbackMachineKey(), nil
 	}
 	return key, nil
+}
+
+var machineKeyFallbackOnce sync.Once
+
+func fallbackMachineKey() []byte {
+	machineKeyFallbackOnce.Do(func() {
+		fmt.Fprintln(os.Stderr, machineKeyFallbackWarning)
+	})
+	return deriveMachineKey()
 }
 
 func loadEncryptionKey() ([]byte, error) {

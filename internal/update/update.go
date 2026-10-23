@@ -12,7 +12,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -32,6 +31,7 @@ const (
 	latestCacheFile     = ".cli-latest-version"
 	lastRunVersionFile  = ".cli-last-run-version"
 	checksumFileName    = "futu_checksums.txt"
+	versionFileName     = "VERSION"
 	defaultReleaseBase  = "https://github.com/FutunnOpen/futu-cli"
 	checkInterval       = 24 * time.Hour
 	checkTimeout        = 2 * time.Second
@@ -191,14 +191,14 @@ func applyVersion(version string) error {
 	if err := downloadFile(cfg.assetURL(version, asset.Name), archivePath, downloadTimeout); err != nil {
 		return err
 	}
-	if err := verifyChecksum(cfg.checksumURL(version), archivePath, asset.Name); err != nil {
+	if err := verifySignedChecksum(cfg, version, archivePath, asset.Name); err != nil {
 		return err
 	}
 	binPath, err := extractBinary(archivePath, asset.Ext, tmpDir)
 	if err != nil {
 		return err
 	}
-	if err := verifyBinaryVersion(binPath, version); err != nil {
+	if err := verifyPackageVersion(archivePath, asset.Ext, version); err != nil {
 		return err
 	}
 	if err := replaceExecutable(binPath, exe); err != nil {
@@ -282,6 +282,10 @@ func (c releaseConfig) assetURL(version, asset string) string {
 
 func (c releaseConfig) checksumURL(version string) string {
 	return c.assetURL(version, checksumFileName)
+}
+
+func (c releaseConfig) checksumSignatureURL(version string) string {
+	return c.assetURL(version, checksumFileName+checksumSignatureSuffix)
 }
 
 func (c releaseConfig) releaseNotesURL(version string) string {
@@ -407,14 +411,21 @@ func downloadFile(url, path string, timeout time.Duration) error {
 	return nil
 }
 
-func verifyChecksum(checksumURL, archivePath, assetName string) error {
+func verifySignedChecksum(cfg releaseConfig, version, archivePath, assetName string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), checkTimeout)
 	defer cancel()
-	data, err := getBytes(ctx, checksumURL)
+	checksums, err := getBytes(ctx, cfg.checksumURL(version))
 	if err != nil {
 		return fmt.Errorf("download checksums: %w", err)
 	}
-	expected := findChecksum(string(data), assetName)
+	signature, err := getBytes(ctx, cfg.checksumSignatureURL(version))
+	if err != nil {
+		return fmt.Errorf("download checksum signature: %w", err)
+	}
+	if err := verifyChecksumSignature(checksums, signature); err != nil {
+		return err
+	}
+	expected := findChecksum(string(checksums), assetName)
 	if len(expected) == 0 {
 		return fmt.Errorf("checksum for %s not found", assetName)
 	}
@@ -533,15 +544,84 @@ func writeExtractedBinary(reader io.Reader, tmpDir, name string) (string, error)
 	return path, nil
 }
 
-func verifyBinaryVersion(binPath, version string) error {
-	out, err := exec.Command(binPath, "version").CombinedOutput()
+func verifyPackageVersion(archivePath, ext, version string) error {
+	content, err := readArchiveFile(archivePath, ext, versionFileName)
 	if err != nil {
-		return fmt.Errorf("verify binary version: %w", err)
+		return err
 	}
-	if !strings.Contains(string(out), normalizeVersion(version)) {
-		return fmt.Errorf("binary version output %q does not contain %s", strings.TrimSpace(string(out)), version)
+	got := normalizeVersion(strings.TrimSpace(string(content)))
+	want := normalizeVersion(version)
+	if got != want {
+		return fmt.Errorf("package %s is %q, want %q", versionFileName, got, want)
 	}
 	return nil
+}
+
+func readArchiveFile(archivePath, ext, name string) ([]byte, error) {
+	switch ext {
+	case archiveExtTarGzip:
+		return readTarGzipFile(archivePath, name)
+	case archiveExtZip:
+		return readZipFile(archivePath, name)
+	default:
+		return nil, fmt.Errorf("unsupported archive extension: %s", ext)
+	}
+}
+
+func readTarGzipFile(archivePath, name string) ([]byte, error) {
+	file, err := os.Open(archivePath)
+	if err != nil {
+		return nil, fmt.Errorf("open archive: %w", err)
+	}
+	defer file.Close()
+	gzipReader, err := gzip.NewReader(file)
+	if err != nil {
+		return nil, fmt.Errorf("open gzip: %w", err)
+	}
+	defer gzipReader.Close()
+	reader := tar.NewReader(gzipReader)
+	for {
+		header, err := reader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("read tar: %w", err)
+		}
+		if filepath.Base(header.Name) != name {
+			continue
+		}
+		data, err := io.ReadAll(reader)
+		if err != nil {
+			return nil, fmt.Errorf("read %s: %w", name, err)
+		}
+		return data, nil
+	}
+	return nil, fmt.Errorf("%s not found in archive", name)
+}
+
+func readZipFile(archivePath, name string) ([]byte, error) {
+	reader, err := zip.OpenReader(archivePath)
+	if err != nil {
+		return nil, fmt.Errorf("open zip: %w", err)
+	}
+	defer reader.Close()
+	for _, file := range reader.File {
+		if filepath.Base(file.Name) != name {
+			continue
+		}
+		rc, err := file.Open()
+		if err != nil {
+			return nil, fmt.Errorf("open zip entry: %w", err)
+		}
+		data, err := io.ReadAll(rc)
+		_ = rc.Close()
+		if err != nil {
+			return nil, fmt.Errorf("read %s: %w", name, err)
+		}
+		return data, nil
+	}
+	return nil, fmt.Errorf("%s not found in archive", name)
 }
 
 func replaceExecutable(newBinary, current string) error {

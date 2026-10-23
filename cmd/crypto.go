@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/futunn/futu/internal/dryrun"
 	"github.com/futunn/futu/internal/output"
 	"github.com/futunn/futu/internal/service"
 )
@@ -71,6 +72,7 @@ var cryptoOrderFlags struct {
 	orderStatus     string
 	orderVersion    int64
 	groupByOrder    bool
+	execute         string
 }
 
 type cryptoFillOrderSummary struct {
@@ -128,7 +130,7 @@ var cryptoOrderCmd = &cobra.Command{
 var cryptoOrderPlaceCmd = &cobra.Command{
 	Use:   "place <symbol>",
 	Short: "Place a cryptocurrency order",
-	Long:  "Place a cryptocurrency order, supporting limit, market, and conditional orders.",
+	Long:  "Preview a cryptocurrency order by default. Re-run with --execute <confirmation_code> to submit. Supports limit, market, and conditional orders.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runCryptoPlaceOrder(cmd, args[0], "")
@@ -138,7 +140,7 @@ var cryptoOrderPlaceCmd = &cobra.Command{
 var cryptoOrderBuyCmd = &cobra.Command{
 	Use:   "buy <symbol>",
 	Short: "Place a cryptocurrency buy order",
-	Long:  "Place a cryptocurrency buy order.",
+	Long:  "Preview a cryptocurrency buy order by default. Re-run with --execute <confirmation_code> to submit.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runCryptoPlaceOrder(cmd, args[0], cryptoSideBuy)
@@ -148,7 +150,7 @@ var cryptoOrderBuyCmd = &cobra.Command{
 var cryptoOrderSellCmd = &cobra.Command{
 	Use:   "sell <symbol>",
 	Short: "Place a cryptocurrency sell order",
-	Long:  "Place a cryptocurrency sell order.",
+	Long:  "Preview a cryptocurrency sell order by default. Re-run with --execute <confirmation_code> to submit.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runCryptoPlaceOrder(cmd, args[0], cryptoSideSell)
@@ -158,7 +160,7 @@ var cryptoOrderSellCmd = &cobra.Command{
 var cryptoOrderModifyCmd = &cobra.Command{
 	Use:   "modify <order-id>",
 	Short: "Modify a cryptocurrency order",
-	Long:  "Modify the price, quantity, or conditional information of the specified cryptocurrency order.",
+	Long:  "Preview a cryptocurrency order modification by default. Re-run with --execute <confirmation_code> to modify price, quantity, or conditional information.",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runCryptoModifyOrder,
 }
@@ -166,7 +168,7 @@ var cryptoOrderModifyCmd = &cobra.Command{
 var cryptoOrderCancelCmd = &cobra.Command{
 	Use:   "cancel <order-id>",
 	Short: "Cancel a cryptocurrency order",
-	Long:  "Cancel the specified cryptocurrency order.",
+	Long:  "Preview cancellation by default. Re-run with --execute <confirmation_code> to cancel the specified cryptocurrency order.",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runCryptoCancelOrder,
 }
@@ -224,6 +226,11 @@ func init() {
 	registerCryptoDetailOrderFlags(cryptoOrderDetailCmd)
 	registerCryptoDealFlags(cryptoDealCmd)
 	registerCryptoDealHistoryFlags(cryptoDealHistoryCmd)
+	registerExecuteFlag(cryptoOrderPlaceCmd, &cryptoOrderFlags.execute)
+	registerExecuteFlag(cryptoOrderBuyCmd, &cryptoOrderFlags.execute)
+	registerExecuteFlag(cryptoOrderSellCmd, &cryptoOrderFlags.execute)
+	registerExecuteFlag(cryptoOrderModifyCmd, &cryptoOrderFlags.execute)
+	registerExecuteFlag(cryptoOrderCancelCmd, &cryptoOrderFlags.execute)
 	cryptoAccountCmd.AddCommand(cryptoAccountListCmd)
 	cryptoOrderCmd.AddCommand(
 		cryptoOrderPlaceCmd,
@@ -376,6 +383,14 @@ func runCryptoPlaceOrder(cmd *cobra.Command, symbol string, fixedSide string) er
 	if err != nil {
 		return err
 	}
+	proceed, err := gateTradeExecution(
+		dryrun.Order(req.Side, req.Symbol, cryptoOrderQuantity(req), req.Price),
+		cryptoOrderFlags.execute,
+		cryptoPlaceOrderPreview(req),
+	)
+	if err != nil || !proceed {
+		return err
+	}
 	ctx := cmdContext(cmd)
 	result, err := cryptoSvc.PlaceOrder(ctx, req)
 	if err != nil {
@@ -390,6 +405,21 @@ func runCryptoPlaceOrder(cmd *cobra.Command, symbol string, fixedSide string) er
 func runCryptoModifyOrder(cmd *cobra.Command, args []string) error {
 	req, err := buildCryptoModifyOrderRequest()
 	if err != nil {
+		return err
+	}
+	proceed, err := gateTradeExecution(
+		dryrun.Replace(args[0], req.Qty, req.Price),
+		cryptoOrderFlags.execute,
+		map[string]any{
+			"action":        "modify",
+			"order_id":      args[0],
+			"qty":           req.Qty,
+			"price":         req.Price,
+			"order_version": req.OrderVersion,
+			"account":       req.Account,
+		},
+	)
+	if err != nil || !proceed {
 		return err
 	}
 	ctx := cmdContext(cmd)
@@ -408,6 +438,18 @@ func runCryptoCancelOrder(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	proceed, err := gateTradeExecution(
+		dryrun.OnOrder("cancel", args[0]),
+		cryptoOrderFlags.execute,
+		map[string]any{
+			"action":   "cancel",
+			"order_id": args[0],
+			"account":  req.Account,
+		},
+	)
+	if err != nil || !proceed {
+		return err
+	}
 	ctx := cmdContext(cmd)
 	result, err := cryptoSvc.CancelOrder(ctx, args[0], req)
 	if err != nil {
@@ -417,6 +459,26 @@ func runCryptoCancelOrder(cmd *cobra.Command, args []string) error {
 		renderCryptoCancelResult(args[0], result)
 	})
 	return nil
+}
+
+func cryptoOrderQuantity(req service.CryptoPlaceOrderRequest) string {
+	if len(strings.TrimSpace(req.Qty)) > 0 {
+		return req.Qty
+	}
+	return req.CashOrderQty
+}
+
+func cryptoPlaceOrderPreview(req service.CryptoPlaceOrderRequest) map[string]any {
+	return map[string]any{
+		"side":          req.Side,
+		"symbol":        req.Symbol,
+		"qty":           req.Qty,
+		"cash_qty":      req.CashOrderQty,
+		"type":          req.OrderType,
+		"price":         req.Price,
+		"account":       req.Account,
+		"time_in_force": req.TimeInForce,
+	}
 }
 
 func runCryptoListOrders(cmd *cobra.Command, _ []string) error {

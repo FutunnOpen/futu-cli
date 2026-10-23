@@ -5,8 +5,14 @@ PRODUCT="futu"
 BINARY="futu"
 ENV_PREFIX="FUTU_CLI"
 CHECKSUMS_ASSET="futu_checksums.txt"
+CHECKSUMS_SIGNATURE_ASSET="futu_checksums.txt.sig"
+VERSION_FILE="VERSION"
 DEFAULT_INSTALL_DIR="$HOME/.futu/bin"
 DEFAULT_RELEASE_BASE="https://github.com/FutunnOpen/futu-cli"
+RELEASE_PUBLIC_KEY_PEM='-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyk556CXX05/DwVDZl9lJIt74Vut5
++4Fj6BuwyUATzxXDI5O3GohEhC3X3m0ygsH/p3ClarvAUwfmRF+1DfEkWQ==
+-----END PUBLIC KEY-----'
 INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
 RELEASE_BASE="${FUTU_CLI_RELEASE_BASE:-$DEFAULT_RELEASE_BASE}"
 VERSION="${FUTU_CLI_VERSION:-}"
@@ -141,8 +147,20 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 
 ARCHIVE="$TMP_DIR/$ASSET"
 CHECKSUMS="$TMP_DIR/$CHECKSUMS_ASSET"
+SIGNATURE="$TMP_DIR/$CHECKSUMS_SIGNATURE_ASSET"
+PUBKEY="$TMP_DIR/release.pub"
 curl -fsSL "$RELEASE_BASE/releases/download/$VERSION/$ASSET" -o "$ARCHIVE"
 curl -fsSL "$RELEASE_BASE/releases/download/$VERSION/$CHECKSUMS_ASSET" -o "$CHECKSUMS"
+curl -fsSL "$RELEASE_BASE/releases/download/$VERSION/$CHECKSUMS_SIGNATURE_ASSET" -o "$SIGNATURE"
+printf '%s\n' "$RELEASE_PUBLIC_KEY_PEM" >"$PUBKEY"
+if ! command -v openssl >/dev/null 2>&1; then
+  echo "openssl is required to verify the release signature" >&2
+  exit 1
+fi
+if ! openssl dgst -sha256 -verify "$PUBKEY" -signature "$SIGNATURE" "$CHECKSUMS" >/dev/null; then
+  echo "checksum signature verification failed" >&2
+  exit 1
+fi
 
 EXPECTED="$(awk -v asset="$ASSET" '$2 == asset {print $1}' "$CHECKSUMS")"
 if [ -z "$EXPECTED" ]; then
@@ -161,11 +179,16 @@ if [ ! -f "$TMP_DIR/unpack/$BINARY" ]; then
   echo "$BINARY not found in archive" >&2
   exit 1
 fi
-chmod 0755 "$TMP_DIR/unpack/$BINARY"
-if ! "$TMP_DIR/unpack/$BINARY" version | grep -q "$VERSION"; then
-  echo "$BINARY version output does not contain $VERSION" >&2
+if [ ! -f "$TMP_DIR/unpack/$VERSION_FILE" ]; then
+  echo "$VERSION_FILE not found in archive" >&2
   exit 1
 fi
+PACKAGE_VERSION="$(tr -d '[:space:]' <"$TMP_DIR/unpack/$VERSION_FILE")"
+if [ "$PACKAGE_VERSION" != "$VERSION" ]; then
+  echo "package $VERSION_FILE is $PACKAGE_VERSION, want $VERSION" >&2
+  exit 1
+fi
+chmod 0755 "$TMP_DIR/unpack/$BINARY"
 
 cp "$TMP_DIR/unpack/$BINARY" "$INSTALL_DIR/$BINARY"
 chmod 0755 "$INSTALL_DIR/$BINARY"

@@ -55,7 +55,16 @@ jobs:
         run: go test ./...
 
       - name: Build release assets
-        run: scripts/build-release.sh "${{ steps.meta.outputs.version }}"
+        env:
+          FUTU_CLI_RELEASE_SIGNING_KEY: ${{ secrets.FUTU_CLI_RELEASE_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${FUTU_CLI_RELEASE_SIGNING_KEY}" ]]; then
+            echo "FUTU_CLI_RELEASE_SIGNING_KEY secret is required to sign futu_checksums.txt" >&2
+            exit 1
+          fi
+          scripts/build-release.sh "${{ steps.meta.outputs.version }}"
+          test -f "dist/futu_checksums.txt.sig"
 
       - name: Delete existing release
         if: ${{ inputs.delete_existing }}

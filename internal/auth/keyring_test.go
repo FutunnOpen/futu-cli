@@ -2,8 +2,11 @@ package auth
 
 import (
 	"bytes"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/zalando/go-keyring"
@@ -123,6 +126,33 @@ func TestEncryptAndSave_DecryptAndLoad_RoundTrip(t *testing.T) {
 	}
 }
 
+func TestEncryptAndSaveWarnsWhenKeyringUnavailable(t *testing.T) {
+	keyring.MockInitWithError(errors.New("keyring unavailable"))
+	t.Cleanup(keyring.MockInit)
+	path := filepath.Join(t.TempDir(), "token.enc")
+	data := []byte(`{"access_token":"secret"}`)
+
+	output := captureAuthStderr(t, func() {
+		if err := EncryptAndSave(path, data); err != nil {
+			t.Fatalf("EncryptAndSave: %v", err)
+		}
+	})
+	if !strings.Contains(output, "system keyring is unavailable") {
+		t.Fatalf("stderr = %q", output)
+	}
+	encrypted, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read encrypted token: %v", err)
+	}
+	decrypted, err := decryptAESGCM(deriveMachineKey(), encrypted)
+	if err != nil {
+		t.Fatalf("decrypt with machine key: %v", err)
+	}
+	if !bytes.Equal(decrypted, data) {
+		t.Fatalf("decrypted = %q, want %q", decrypted, data)
+	}
+}
+
 func TestEncryptAndSaveUsesRandomKeyringKey(t *testing.T) {
 	keyring.MockInit()
 	path := filepath.Join(t.TempDir(), "token.enc")
@@ -231,4 +261,25 @@ func TestEnsureParentDir_CreatesNestedDir(t *testing.T) {
 	if !info.IsDir() {
 		t.Error("expected directory")
 	}
+}
+
+func captureAuthStderr(t *testing.T, fn func()) string {
+	t.Helper()
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe() error = %v", err)
+	}
+	previous := os.Stderr
+	os.Stderr = writer
+	defer func() { os.Stderr = previous }()
+
+	done := make(chan string)
+	go func() {
+		var buffer bytes.Buffer
+		_, _ = io.Copy(&buffer, reader)
+		done <- buffer.String()
+	}()
+	fn()
+	_ = writer.Close()
+	return <-done
 }
