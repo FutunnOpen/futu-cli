@@ -1091,3 +1091,70 @@ func TestGetTradingInfoReturnsAPIBodyError(t *testing.T) {
 		t.Fatal("expected account API error")
 	}
 }
+
+func TestGetOrderFeesUsesPathParams(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1.0/accounts/acc1/orders/ord99/fees" {
+			t.Fatalf("path = %s", r.URL.Path)
+		}
+		fmt.Fprint(w, `{"s":"ok","d":{"order_id":"ord99","currency":"USD","total_fee":"1.23","fees":[{"type":"commission","amount":"1.23"}]}}`)
+	}))
+	defer server.Close()
+
+	tradeService := NewTradeService(client.New(server.URL))
+	fees, err := tradeService.GetOrderFees(context.Background(), "acc1", "ord99")
+	if err != nil {
+		t.Fatalf("GetOrderFees() error = %v", err)
+	}
+	if fees.TotalFee != "1.23" || len(fees.Fees) != 1 {
+		t.Fatalf("fees = %#v", fees)
+	}
+}
+
+func TestGetMarginRatioQueryParams(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		if q.Get("security_firm") != "FUTUINC" || q.Get("codes") != "US.AAPL" {
+			t.Fatalf("query = %s", q.Encode())
+		}
+		fmt.Fprint(w, `{"s":"ok","d":{"margin_ratios":[{"code":"US.AAPL","is_long_permit":true}]}}`)
+	}))
+	defer server.Close()
+
+	tradeService := NewTradeService(client.New(server.URL))
+	ratios, err := tradeService.GetMarginRatio(context.Background(), MarginRatioRequest{
+		SecurityFirm: "FUTUINC",
+		Codes:        "US.AAPL",
+	})
+	if err != nil {
+		t.Fatalf("GetMarginRatio() error = %v", err)
+	}
+	if len(ratios) != 1 || ratios[0].Code != "US.AAPL" {
+		t.Fatalf("ratios = %#v", ratios)
+	}
+}
+
+func TestListCashLogsPaginationParams(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1.0/accounts/acc1/cash_logs" {
+			t.Fatalf("path = %s", r.URL.Path)
+		}
+		q := r.URL.Query()
+		if q.Get("begin_time") != "1" || q.Get("end_time") != "2" || q.Get("page_size") != "10" {
+			t.Fatalf("query = %s", q.Encode())
+		}
+		fmt.Fprint(w, `{"s":"ok","d":{"cash_logs":[],"page_flag":"next","completed":false}}`)
+	}))
+	defer server.Close()
+
+	tradeService := NewTradeService(client.New(server.URL))
+	page, err := tradeService.ListCashLogs(context.Background(), CashLogsRequest{
+		Account: "acc1", BeginTime: 1, EndTime: 2,
+	})
+	if err != nil {
+		t.Fatalf("ListCashLogs() error = %v", err)
+	}
+	if page.PageFlag != "next" || page.Completed {
+		t.Fatalf("page = %#v", page)
+	}
+}

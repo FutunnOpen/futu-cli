@@ -222,6 +222,14 @@ var orderMaxQtyCmd = &cobra.Command{
 	RunE:  runMaxOrderQty,
 }
 
+var orderFeesCmd = &cobra.Command{
+	Use:   "fees <order-id>",
+	Short: "Query order fee breakdown",
+	Long:  "Get fee details for a single order on the current or selected account.",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runOrderFees,
+}
+
 func init() {
 	registerBuyFlags(orderBuyCmd)
 	registerSellFlags(orderSellCmd)
@@ -237,8 +245,9 @@ func init() {
 	registerExecuteFlag(orderPlaceCmd, &orderFlags.execute)
 	registerExecuteFlag(orderModifyCmd, &orderFlags.execute)
 	registerExecuteFlag(orderCancelCmd, &orderFlags.execute)
+	orderFeesCmd.Flags().StringP("account", "a", "", "Trading account ID")
 
-	orderCmd.AddCommand(orderBuyCmd, orderSellCmd, orderPlaceCmd, orderModifyCmd, orderCancelCmd, orderListCmd, orderHistoryCmd, orderDetailCmd, orderMaxQtyCmd)
+	orderCmd.AddCommand(orderBuyCmd, orderSellCmd, orderPlaceCmd, orderModifyCmd, orderCancelCmd, orderListCmd, orderHistoryCmd, orderDetailCmd, orderMaxQtyCmd, orderFeesCmd)
 	rootCmd.AddCommand(orderCmd)
 }
 
@@ -812,6 +821,35 @@ func buildOrderDetailsRequest(orderIDs []string) (service.OrderDetailsRequest, e
 }
 
 // runMaxOrderQty handles the max-qty subcommand.
+func runOrderFees(cmd *cobra.Command, args []string) error {
+	account, err := cmd.Flags().GetString("account")
+	if err != nil {
+		return fmt.Errorf("reading account flag: %w", err)
+	}
+	account = resolveAccount(account)
+	if len(account) == 0 {
+		return fmt.Errorf("account ID is required; use --account or configure default_account")
+	}
+	ctx := cmdContext(cmd)
+	fees, err := tradeSvc.GetOrderFees(ctx, account, strings.TrimSpace(args[0]))
+	if err != nil {
+		return fmt.Errorf("fetching order fees: %w", err)
+	}
+	printResult(fees, func() {
+		renderOrderFeesTable(fees)
+	})
+	return nil
+}
+
+func renderOrderFeesTable(fees *service.OrderFees) {
+	tw := output.NewTableWriter(os.Stdout, "Type", "Amount")
+	for _, item := range fees.Fees {
+		tw.AddRow(item.Type, item.Amount)
+	}
+	tw.Render()
+	fmt.Fprintf(os.Stdout, "Total: %s %s (order %s)\n", fees.TotalFee, fees.Currency, fees.OrderID)
+}
+
 func runMaxOrderQty(cmd *cobra.Command, args []string) error {
 	req, err := buildTradingInfoRequest(args[0])
 	if err != nil {

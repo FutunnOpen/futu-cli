@@ -123,11 +123,28 @@ var accountFundsCmd = &cobra.Command{
 	RunE:  runAccountFunds,
 }
 
+var accountCashLogsCmd = &cobra.Command{
+	Use:   "cash-logs",
+	Short: "List account cash movement logs",
+	Long:  "Query paginated cash logs for an account. Timestamps use microseconds.",
+	RunE:  runAccountCashLogs,
+}
+
 func init() {
 	accountFundsCmd.Flags().StringP("account", "a", "", "Trading account ID")
 	accountFundsCmd.Flags().StringP("currency", "c", defaultFundsCurrency, "Display currency")
+	accountCashLogsCmd.Flags().StringP("account", "a", "", "Trading account ID")
+	accountCashLogsCmd.Flags().Int64("begin-time", 0, "Begin time (microseconds, required)")
+	accountCashLogsCmd.Flags().Int64("end-time", 0, "End time (microseconds, required)")
+	accountCashLogsCmd.Flags().String("direction", "", "Filter: IN or OUT")
+	accountCashLogsCmd.Flags().String("code", "", "Filter by symbol MARKET.CODE")
+	accountCashLogsCmd.Flags().String("page-flag", "", "Pagination cursor from previous page")
+	accountCashLogsCmd.Flags().Int("page-size", 10, "Page size (max 20)")
+	_ = accountCashLogsCmd.MarkFlagRequired("begin-time")
+	_ = accountCashLogsCmd.MarkFlagRequired("end-time")
 	accountCmd.AddCommand(accountListCmd)
 	accountCmd.AddCommand(accountFundsCmd)
+	accountCmd.AddCommand(accountCashLogsCmd)
 	rootCmd.AddCommand(accountCmd)
 }
 
@@ -238,6 +255,69 @@ func runAccountFunds(cmd *cobra.Command, _ []string) error {
 }
 
 // renderFundsTable writes funds data as a formatted table to stdout.
+func runAccountCashLogs(cmd *cobra.Command, _ []string) error {
+	account, err := cmd.Flags().GetString("account")
+	if err != nil {
+		return fmt.Errorf("reading account flag: %w", err)
+	}
+	account = resolveAccount(account)
+	if len(account) == 0 {
+		return fmt.Errorf("account ID is required; use --account or configure default_account")
+	}
+	beginTime, err := cmd.Flags().GetInt64("begin-time")
+	if err != nil {
+		return fmt.Errorf("reading begin-time: %w", err)
+	}
+	endTime, err := cmd.Flags().GetInt64("end-time")
+	if err != nil {
+		return fmt.Errorf("reading end-time: %w", err)
+	}
+	direction, err := cmd.Flags().GetString("direction")
+	if err != nil {
+		return fmt.Errorf("reading direction: %w", err)
+	}
+	code, err := cmd.Flags().GetString("code")
+	if err != nil {
+		return fmt.Errorf("reading code: %w", err)
+	}
+	pageFlag, err := cmd.Flags().GetString("page-flag")
+	if err != nil {
+		return fmt.Errorf("reading page-flag: %w", err)
+	}
+	pageSize, err := cmd.Flags().GetInt("page-size")
+	if err != nil {
+		return fmt.Errorf("reading page-size: %w", err)
+	}
+	ctx := cmdContext(cmd)
+	page, err := tradeSvc.ListCashLogs(ctx, service.CashLogsRequest{
+		Account:   account,
+		BeginTime: beginTime,
+		EndTime:   endTime,
+		Direction: direction,
+		Code:      code,
+		PageFlag:  pageFlag,
+		PageSize:  pageSize,
+	})
+	if err != nil {
+		return fmt.Errorf("fetching cash logs: %w", err)
+	}
+	printResult(page, func() {
+		renderCashLogsTable(page)
+	})
+	return nil
+}
+
+func renderCashLogsTable(page *service.CashLogsPage) {
+	tw := output.NewTableWriter(os.Stdout, "Time", "Transaction", "Change", "Balance", "Symbol")
+	for _, log := range page.CashLogs {
+		tw.AddRow(log.CreatedTime, log.TransactionName, log.CashChange, log.Balance, log.Symbol)
+	}
+	tw.Render()
+	if page.PageFlag != "" {
+		fmt.Fprintf(os.Stdout, "page_flag: %s completed: %v\n", page.PageFlag, page.Completed)
+	}
+}
+
 func renderFundsTable(funds *service.Funds) {
 	tw := output.NewTableWriter(os.Stdout, fundsHeaderKey, fundsHeaderValue)
 	tw.AddRow(fundsLabelCurrency, funds.Currency)

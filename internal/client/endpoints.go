@@ -108,6 +108,14 @@ var Endpoints = map[string]Endpoint{
 	"trade.account.list":  {Method: http.MethodGet, Path: "/api/v1.0/accounts/authorized_trd_accs"},
 	"trade.account.funds": {Method: http.MethodGet, Path: "/api/v1.0/accounts/{acc_id}/funds"},
 	"trade.account.info":  {Method: http.MethodGet, Path: "/api/v1.0/accounts/{acc_id}/acctradinginfo"},
+	"trade.order.fees":    {Method: http.MethodGet, Path: "/api/v1.0/accounts/{acc_id}/orders/{order_id}/fees"},
+	"trade.margin_ratio":  {Method: http.MethodGet, Path: "/api/v1.0/margin_ratio"},
+	"trade.account.cash_logs": {Method: http.MethodGet, Path: "/api/v1.0/accounts/{acc_id}/cash_logs"},
+
+	// ── SkillWrap (OpenD-aligned anomaly; path on api_base / gateway) ───
+	"skillwrap.technical_unusual":  {Method: http.MethodPost, Path: "/api/v1/get_technical_unusual"},
+	"skillwrap.financial_unusual":  {Method: http.MethodPost, Path: "/api/v1/get_financial_unusual"},
+	"skillwrap.derivative_unusual": {Method: http.MethodPost, Path: "/api/v1/get_derivative_unusual"},
 
 	// ── Crypto Trading ───────────────────────────────────────────────────
 	"crypto.account.total_balance": {Method: http.MethodGet, Path: "/api/v1/crypto/accounts/{acc_id}/total-balance"},

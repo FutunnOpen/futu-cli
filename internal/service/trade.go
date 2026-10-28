@@ -24,9 +24,15 @@ const (
 	endpointDealToday    = "trade.deal.today"
 	endpointDealHistory  = "trade.deal.history"
 	endpointAccountList  = "trade.account.list"
-	endpointAccountFund  = "trade.account.funds"
-	endpointAccountInfo  = "trade.account.info"
-	accountAPIStatusOK   = "ok"
+	endpointAccountFund   = "trade.account.funds"
+	endpointAccountInfo   = "trade.account.info"
+	endpointOrderFees     = "trade.order.fees"
+	endpointMarginRatio   = "trade.margin_ratio"
+	endpointAccountCashLogs = "trade.account.cash_logs"
+	accountAPIStatusOK    = "ok"
+
+	defaultCashLogsPageSize = 10
+	maxCashLogsPageSize     = 20
 
 	DefaultTradingMarket = "HK"
 	DefaultPageSize      = 50
@@ -1132,6 +1138,163 @@ func (s *TradeService) GetTradingInfo(ctx context.Context, req TradingInfoReques
 	var resp tradingInfoResponse
 	if err := s.client.Call(ctx, endpointAccountInfo, opts, &resp); err != nil {
 		return nil, fmt.Errorf("get trading info: %w", err)
+	}
+	if err := checkAccountAPIStatus(resp.Status, resp.ErrorCode, resp.ErrorMessage); err != nil {
+		return nil, err
+	}
+	return &resp.Data, nil
+}
+
+// OrderFeeItem is one line in an order fee breakdown.
+type OrderFeeItem struct {
+	Type   string `json:"type"`
+	Amount string `json:"amount"`
+}
+
+// OrderFees is the fee summary for a single order.
+type OrderFees struct {
+	OrderID  string         `json:"order_id"`
+	Currency string         `json:"currency"`
+	TotalFee string         `json:"total_fee"`
+	Fees     []OrderFeeItem `json:"fees"`
+}
+
+type orderFeesResponse struct {
+	Status       string    `json:"s"`
+	ErrorCode    int       `json:"errcode"`
+	ErrorMessage string    `json:"errmsg"`
+	Data         OrderFees `json:"d"`
+}
+
+// GetOrderFees returns fee details for an order. See Open API get-order-fees.
+func (s *TradeService) GetOrderFees(ctx context.Context, account, orderID string) (*OrderFees, error) {
+	opts := client.CallOpts{
+		PathParams: map[string]string{"acc_id": account, "order_id": orderID},
+	}
+	var resp orderFeesResponse
+	if err := s.client.Call(ctx, endpointOrderFees, opts, &resp); err != nil {
+		return nil, fmt.Errorf("get order fees: %w", err)
+	}
+	if err := checkAccountAPIStatus(resp.Status, resp.ErrorCode, resp.ErrorMessage); err != nil {
+		return nil, err
+	}
+	return &resp.Data, nil
+}
+
+// MarginRatio is margin and short-selling data for one symbol.
+type MarginRatio struct {
+	Code            string `json:"code"`
+	IsLongPermit    bool   `json:"is_long_permit"`
+	IsShortPermit   bool   `json:"is_short_permit"`
+	ShortPoolRemain string `json:"short_pool_remain"`
+	ShortFeeRate    string `json:"short_fee_rate"`
+	AlertLongRatio  string `json:"alert_long_ratio"`
+	AlertShortRatio string `json:"alert_short_ratio"`
+	IMLongRatio     string `json:"im_long_ratio"`
+	IMShortRatio    string `json:"im_short_ratio"`
+	MCMLongRatio    string `json:"mcm_long_ratio"`
+	MCMShortRatio   string `json:"mcm_short_ratio"`
+	MMLongRatio     string `json:"mm_long_ratio"`
+	MMShortRatio    string `json:"mm_short_ratio"`
+}
+
+type marginRatioResponse struct {
+	Status       string `json:"s"`
+	ErrorCode    int    `json:"errcode"`
+	ErrorMessage string `json:"errmsg"`
+	Data         struct {
+		MarginRatios []MarginRatio `json:"margin_ratios"`
+	} `json:"d"`
+}
+
+// MarginRatioRequest queries margin data for up to 10 symbols.
+type MarginRatioRequest struct {
+	SecurityFirm string
+	Codes        string // comma-separated MARKET.CODE
+}
+
+// GetMarginRatio returns margin ratios for the requested symbols.
+func (s *TradeService) GetMarginRatio(ctx context.Context, req MarginRatioRequest) ([]MarginRatio, error) {
+	params := url.Values{
+		"security_firm": {strings.TrimSpace(req.SecurityFirm)},
+		"codes":         {strings.TrimSpace(req.Codes)},
+	}
+	var resp marginRatioResponse
+	if err := s.client.Call(ctx, endpointMarginRatio, client.CallOpts{Params: params}, &resp); err != nil {
+		return nil, fmt.Errorf("get margin ratio: %w", err)
+	}
+	if err := checkAccountAPIStatus(resp.Status, resp.ErrorCode, resp.ErrorMessage); err != nil {
+		return nil, err
+	}
+	return resp.Data.MarginRatios, nil
+}
+
+// CashLog is one account cash movement record.
+type CashLog struct {
+	TransactionName string `json:"transaction_name"`
+	CreatedTime     string `json:"created_time"`
+	CashChange      string `json:"cash_change"`
+	Balance         string `json:"balance"`
+	Symbol          string `json:"symbol"`
+	StockName       string `json:"stock_name"`
+}
+
+// CashLogsRequest filters paginated cash logs (times in microseconds).
+type CashLogsRequest struct {
+	Account  string
+	BeginTime int64
+	EndTime   int64
+	Direction string // IN, OUT, or empty
+	Code      string
+	PageFlag  string
+	PageSize  int
+}
+
+// CashLogsPage is one page of cash logs.
+type CashLogsPage struct {
+	CashLogs  []CashLog `json:"cash_logs"`
+	PageFlag  string    `json:"page_flag"`
+	Completed bool      `json:"completed"`
+}
+
+type cashLogsResponse struct {
+	Status       string       `json:"s"`
+	ErrorCode    int          `json:"errcode"`
+	ErrorMessage string       `json:"errmsg"`
+	Data         CashLogsPage `json:"d"`
+}
+
+// ListCashLogs fetches one page of cash logs.
+func (s *TradeService) ListCashLogs(ctx context.Context, req CashLogsRequest) (*CashLogsPage, error) {
+	params := url.Values{
+		"begin_time": {strconv.FormatInt(req.BeginTime, 10)},
+		"end_time":   {strconv.FormatInt(req.EndTime, 10)},
+	}
+	if dir := strings.TrimSpace(req.Direction); dir != "" {
+		params.Set("direction", dir)
+	}
+	if code := strings.TrimSpace(req.Code); code != "" {
+		params.Set("code", code)
+	}
+	if flag := strings.TrimSpace(req.PageFlag); flag != "" {
+		params.Set("page_flag", flag)
+	}
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = defaultCashLogsPageSize
+	}
+	if pageSize > maxCashLogsPageSize {
+		pageSize = maxCashLogsPageSize
+	}
+	params.Set("page_size", strconv.Itoa(pageSize))
+
+	opts := client.CallOpts{
+		PathParams: map[string]string{"acc_id": req.Account},
+		Params:     params,
+	}
+	var resp cashLogsResponse
+	if err := s.client.Call(ctx, endpointAccountCashLogs, opts, &resp); err != nil {
+		return nil, fmt.Errorf("list cash logs: %w", err)
 	}
 	if err := checkAccountAPIStatus(resp.Status, resp.ErrorCode, resp.ErrorMessage); err != nil {
 		return nil, err
