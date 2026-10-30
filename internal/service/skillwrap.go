@@ -26,7 +26,7 @@ type UnusualRequest struct {
 	AnalysisDimensions []string
 }
 
-// UnusualResult is the CLI JSON shape for anomaly commands (T07).
+// UnusualResult is the CLI JSON shape for unusual commands (T07).
 type UnusualResult struct {
 	RetType     int    `json:"retType"`
 	ErrCode     int    `json:"errCode"`

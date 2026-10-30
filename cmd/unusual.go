@@ -11,49 +11,53 @@ import (
 )
 
 const (
-	defaultAnomalyTimeRange  = 7
-	defaultAnomalyLanguageID = 0
+	defaultUnusualTimeRange  = 7
+	defaultUnusualLanguageID = 0
 )
 
-var anomalyCmd = &cobra.Command{
-	Use:   "anomaly",
-	Short: "Stock unusual-move analysis (SkillWrap)",
-	Long:  "Query technical, capital-flow, and derivatives unusual-move analysis aligned with OpenD SkillWrap APIs.",
+var unusualCmd = &cobra.Command{
+	Use:     "unusual",
+	Aliases: []string{"anomaly"},
+	Short:   "Stock unusual-move analysis (SkillWrap)",
+	Long:    "Query technical signal alerts, unusual capital flows, and unusual derivatives activity (OpenD SkillWrap APIs).",
 }
 
-var anomalyTechnicalCmd = &cobra.Command{
-	Use:   "technical <symbol>",
-	Short: "Technical unusual analysis",
-	Args:  cobra.ExactArgs(1),
-	RunE:  runAnomalyTechnical,
+var unusualTechnicalCmd = &cobra.Command{
+	Use:     "technical-signals",
+	Aliases: []string{"technical"},
+	Short:   "Technical signal alerts (get_technical_unusual)",
+	Args:    cobra.ExactArgs(1),
+	RunE:    runUnusualTechnical,
 }
 
-var anomalyCapitalCmd = &cobra.Command{
-	Use:   "capital <symbol>",
-	Short: "Financial / capital unusual analysis",
-	Args:  cobra.ExactArgs(1),
-	RunE:  runAnomalyCapital,
+var unusualCapitalCmd = &cobra.Command{
+	Use:     "capital-flows",
+	Aliases: []string{"capital"},
+	Short:   "Unusual capital flows (get_financial_unusual)",
+	Args:    cobra.ExactArgs(1),
+	RunE:    runUnusualCapital,
 }
 
-var anomalyDerivativesCmd = &cobra.Command{
-	Use:   "derivatives <symbol>",
-	Short: "Derivatives unusual analysis",
-	Args:  cobra.ExactArgs(1),
-	RunE:  runAnomalyDerivatives,
+var unusualDerivativesCmd = &cobra.Command{
+	Use:     "derivatives-activity",
+	Aliases: []string{"derivatives"},
+	Short:   "Unusual derivatives activity (get_derivative_unusual)",
+	Args:    cobra.ExactArgs(1),
+	RunE:    runUnusualDerivatives,
 }
 
 func init() {
-	registerAnomalyFlags(anomalyTechnicalCmd, true, false)
-	registerAnomalyFlags(anomalyCapitalCmd, false, true)
-	registerAnomalyFlags(anomalyDerivativesCmd, false, true)
+	registerUnusualFlags(unusualTechnicalCmd, true, false)
+	registerUnusualFlags(unusualCapitalCmd, false, true)
+	registerUnusualFlags(unusualDerivativesCmd, false, true)
 
-	anomalyCmd.AddCommand(anomalyTechnicalCmd, anomalyCapitalCmd, anomalyDerivativesCmd)
-	rootCmd.AddCommand(anomalyCmd)
+	unusualCmd.AddCommand(unusualTechnicalCmd, unusualCapitalCmd, unusualDerivativesCmd)
+	rootCmd.AddCommand(unusualCmd)
 }
 
-func registerAnomalyFlags(cmd *cobra.Command, technical, dimensions bool) {
-	cmd.Flags().Int("time-range", defaultAnomalyTimeRange, "Natural-day lookback window")
-	cmd.Flags().Int("language-id", defaultAnomalyLanguageID, "Language: 0 zh-CN, 1 zh-TW, 2 en, 4 th, 5 ja")
+func registerUnusualFlags(cmd *cobra.Command, technical, dimensions bool) {
+	cmd.Flags().Int("time-range", defaultUnusualTimeRange, "Natural-day lookback window")
+	cmd.Flags().Int("language-id", defaultUnusualLanguageID, "Language: 0 zh-CN, 1 zh-TW, 2 en, 4 th, 5 ja")
 	if technical {
 		cmd.Flags().StringSlice("indicator-filters", nil, "Indicator filters (repeat flag or comma-separated)")
 	}
@@ -62,27 +66,27 @@ func registerAnomalyFlags(cmd *cobra.Command, technical, dimensions bool) {
 	}
 }
 
-func runAnomalyTechnical(cmd *cobra.Command, args []string) error {
-	return runAnomaly(cmd, args[0], func(ctx context.Context, req service.UnusualRequest) (*service.UnusualResult, error) {
+func runUnusualTechnical(cmd *cobra.Command, args []string) error {
+	return runUnusual(cmd, args[0], func(ctx context.Context, req service.UnusualRequest) (*service.UnusualResult, error) {
 		return skillWrapSvc.GetTechnicalUnusual(ctx, req)
 	})
 }
 
-func runAnomalyCapital(cmd *cobra.Command, args []string) error {
-	return runAnomaly(cmd, args[0], func(ctx context.Context, req service.UnusualRequest) (*service.UnusualResult, error) {
+func runUnusualCapital(cmd *cobra.Command, args []string) error {
+	return runUnusual(cmd, args[0], func(ctx context.Context, req service.UnusualRequest) (*service.UnusualResult, error) {
 		return skillWrapSvc.GetFinancialUnusual(ctx, req)
 	})
 }
 
-func runAnomalyDerivatives(cmd *cobra.Command, args []string) error {
-	return runAnomaly(cmd, args[0], func(ctx context.Context, req service.UnusualRequest) (*service.UnusualResult, error) {
+func runUnusualDerivatives(cmd *cobra.Command, args []string) error {
+	return runUnusual(cmd, args[0], func(ctx context.Context, req service.UnusualRequest) (*service.UnusualResult, error) {
 		return skillWrapSvc.GetDerivativeUnusual(ctx, req)
 	})
 }
 
 type unusualFetcher func(context.Context, service.UnusualRequest) (*service.UnusualResult, error)
 
-func runAnomaly(cmd *cobra.Command, symbol string, fetch unusualFetcher) error {
+func runUnusual(cmd *cobra.Command, symbol string, fetch unusualFetcher) error {
 	req, err := buildUnusualRequest(cmd, symbol)
 	if err != nil {
 		return err
