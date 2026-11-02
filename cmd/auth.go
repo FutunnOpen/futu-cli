@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"os/exec"
-	"runtime"
 	"strings"
 	"time"
 
@@ -680,17 +678,4 @@ func formatOptionalTime(value *int64) string {
 		return statusNA
 	}
 	return time.Unix(*value, 0).Format(time.RFC3339)
-}
-
-func openBrowser(targetURL string) error {
-	switch runtime.GOOS {
-	case "darwin":
-		return exec.Command("open", targetURL).Start()
-	case "linux":
-		return exec.Command("xdg-open", targetURL).Start()
-	case "windows":
-		return exec.Command("cmd", "/c", "start", targetURL).Start()
-	default:
-		return fmt.Errorf("unsupported platform: %s", runtime.GOOS)
-	}
 }
