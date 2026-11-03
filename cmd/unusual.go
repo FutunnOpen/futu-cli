@@ -18,14 +18,14 @@ const (
 var unusualCmd = &cobra.Command{
 	Use:     "unusual",
 	Aliases: []string{"anomaly"},
-	Short:   "Stock unusual-move analysis (SkillWrap)",
-	Long:    "Query technical signal alerts, unusual capital flows, and unusual derivatives activity (OpenD SkillWrap APIs).",
+	Short:   "Stock unusual-move summaries",
+	Long:    "Query technical, capital, and derivatives unusual summaries for one symbol.",
 }
 
 var unusualTechnicalCmd = &cobra.Command{
 	Use:     "technical-signals",
 	Aliases: []string{"technical"},
-	Short:   "Technical signal alerts (get_technical_unusual)",
+	Short:   "Technical unusual summary (POST /quote/{symbol}/unusual/technical)",
 	Args:    cobra.ExactArgs(1),
 	RunE:    runUnusualTechnical,
 }
@@ -33,7 +33,7 @@ var unusualTechnicalCmd = &cobra.Command{
 var unusualCapitalCmd = &cobra.Command{
 	Use:     "capital-flows",
 	Aliases: []string{"capital"},
-	Short:   "Unusual capital flows (get_financial_unusual)",
+	Short:   "Capital unusual summary (POST /quote/{symbol}/unusual/capital)",
 	Args:    cobra.ExactArgs(1),
 	RunE:    runUnusualCapital,
 }
@@ -41,7 +41,7 @@ var unusualCapitalCmd = &cobra.Command{
 var unusualDerivativesCmd = &cobra.Command{
 	Use:     "derivatives-activity",
 	Aliases: []string{"derivatives"},
-	Short:   "Unusual derivatives activity (get_derivative_unusual)",
+	Short:   "Derivatives unusual summary (POST /quote/{symbol}/unusual/derivatives)",
 	Args:    cobra.ExactArgs(1),
 	RunE:    runUnusualDerivatives,
 }
