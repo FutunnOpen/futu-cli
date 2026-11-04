@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -11,27 +10,26 @@ import (
 	"github.com/futunn/futu/internal/client"
 )
 
-func TestGetTechnicalUnusualPostsBody(t *testing.T) {
+func TestGetTechnicalUnusualUsesQuery(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
+		if r.Method != http.MethodGet {
 			t.Fatalf("method = %s", r.Method)
 		}
 		if r.URL.Path != "/api/v1.0/quote/HK.00700/unusual/technical" {
 			t.Fatalf("path = %s", r.URL.Path)
 		}
-		var body map[string]any
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("decode body: %v", err)
+		if r.ContentLength > 0 {
+			t.Fatalf("GET request must not send a body")
 		}
-		if _, ok := body["stock_symbol"]; ok {
-			t.Fatalf("symbol must be a path parameter, body = %#v", body)
+		query := r.URL.Query()
+		if query.Get("time_range") != "7" || query.Get("language_id") != "0" {
+			t.Fatalf("query = %s", r.URL.RawQuery)
 		}
-		if body["time_range"] != float64(7) {
-			t.Fatalf("body = %#v", body)
+		if query.Get("stock_symbol") != "" {
+			t.Fatalf("symbol must be a path parameter, query = %s", r.URL.RawQuery)
 		}
-		filters, _ := body["indicator_filters"].([]any)
-		if len(filters) != 1 || filters[0] != "MACD" {
-			t.Fatalf("indicator_filters = %#v", body["indicator_filters"])
+		if got := query["indicator_filters"]; len(got) != 1 || got[0] != "MACD" {
+			t.Fatalf("indicator_filters = %#v", got)
 		}
 		fmt.Fprint(w, `{"ret_code":0,"ret_msg":"success","data":{"code":0,"message":"","time_range":"2026.1.1-2026.1.8","content":"ok"}}`)
 	}))
@@ -52,6 +50,9 @@ func TestGetTechnicalUnusualPostsBody(t *testing.T) {
 
 func TestGetFinancialUnusualNoAnomaly(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("method = %s", r.Method)
+		}
 		if r.URL.Path != "/api/v1.0/quote/US.AAPL/unusual/capital" {
 			t.Fatalf("path = %s", r.URL.Path)
 		}
@@ -71,6 +72,9 @@ func TestGetFinancialUnusualNoAnomaly(t *testing.T) {
 
 func TestGetDerivativeUnusualGatewayError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("method = %s", r.Method)
+		}
 		if r.URL.Path != "/api/v1.0/quote/HK.00700/unusual/derivatives" {
 			t.Fatalf("path = %s", r.URL.Path)
 		}

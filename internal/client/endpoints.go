@@ -113,9 +113,9 @@ var Endpoints = map[string]Endpoint{
 	"trade.account.cash_logs": {Method: http.MethodGet, Path: "/api/v1.0/accounts/{acc_id}/cash_logs"},
 
 	// ── Quote unusual summaries ──────────────────────────────────────────
-	"skillwrap.technical_unusual":  {Method: http.MethodPost, Path: "/api/v1.0/quote/{symbol}/unusual/technical"},
-	"skillwrap.financial_unusual":  {Method: http.MethodPost, Path: "/api/v1.0/quote/{symbol}/unusual/capital"},
-	"skillwrap.derivative_unusual": {Method: http.MethodPost, Path: "/api/v1.0/quote/{symbol}/unusual/derivatives"},
+	"skillwrap.technical_unusual":  {Method: http.MethodGet, Path: "/api/v1.0/quote/{symbol}/unusual/technical"},
+	"skillwrap.financial_unusual":  {Method: http.MethodGet, Path: "/api/v1.0/quote/{symbol}/unusual/capital"},
+	"skillwrap.derivative_unusual": {Method: http.MethodGet, Path: "/api/v1.0/quote/{symbol}/unusual/derivatives"},
 
 	// ── Crypto Trading ───────────────────────────────────────────────────
 	"crypto.account.total_balance": {Method: http.MethodGet, Path: "/api/v1/crypto/accounts/{acc_id}/total-balance"},

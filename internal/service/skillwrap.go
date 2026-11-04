@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/futunn/futu/internal/client"
@@ -20,7 +22,7 @@ const (
 )
 
 // UnusualRequest is the Open API unusual-summary request.
-// Symbol is a path parameter; the remaining fields are the JSON body.
+// Symbol is a path parameter; the remaining fields are query parameters.
 type UnusualRequest struct {
 	StockSymbol        string
 	TimeRange          int
@@ -57,33 +59,33 @@ func NewSkillWrapService(c *client.Client) *SkillWrapService {
 	return &SkillWrapService{client: c}
 }
 
-// GetTechnicalUnusual calls POST /api/v1.0/quote/{symbol}/unusual/technical.
+// GetTechnicalUnusual calls GET /api/v1.0/quote/{symbol}/unusual/technical.
 func (s *SkillWrapService) GetTechnicalUnusual(ctx context.Context, req UnusualRequest) (*UnusualResult, error) {
-	return s.postUnusual(ctx, endpointTechnicalUnusual, "get_technical_unusual", req)
+	return s.getUnusual(ctx, endpointTechnicalUnusual, "get_technical_unusual", req)
 }
 
-// GetFinancialUnusual calls POST /api/v1.0/quote/{symbol}/unusual/capital.
+// GetFinancialUnusual calls GET /api/v1.0/quote/{symbol}/unusual/capital.
 func (s *SkillWrapService) GetFinancialUnusual(ctx context.Context, req UnusualRequest) (*UnusualResult, error) {
-	return s.postUnusual(ctx, endpointFinancialUnusual, "get_financial_unusual", req)
+	return s.getUnusual(ctx, endpointFinancialUnusual, "get_financial_unusual", req)
 }
 
-// GetDerivativeUnusual calls POST /api/v1.0/quote/{symbol}/unusual/derivatives.
+// GetDerivativeUnusual calls GET /api/v1.0/quote/{symbol}/unusual/derivatives.
 func (s *SkillWrapService) GetDerivativeUnusual(ctx context.Context, req UnusualRequest) (*UnusualResult, error) {
-	return s.postUnusual(ctx, endpointDerivativeUnusual, "get_derivative_unusual", req)
+	return s.getUnusual(ctx, endpointDerivativeUnusual, "get_derivative_unusual", req)
 }
 
-func (s *SkillWrapService) postUnusual(ctx context.Context, endpoint, method string, req UnusualRequest) (*UnusualResult, error) {
+func (s *SkillWrapService) getUnusual(ctx context.Context, endpoint, method string, req UnusualRequest) (*UnusualResult, error) {
 	symbol := strings.TrimSpace(req.StockSymbol)
 	if symbol == "" {
 		return nil, fmt.Errorf("%s: symbol is required", method)
 	}
-	body, err := newSkillWrapBody(req)
+	query, err := newSkillWrapQuery(req)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", method, err)
 	}
 	var env bffEnvelope
 	if err := s.client.Call(ctx, endpoint, client.CallOpts{
-		Body:       body,
+		Params:     query,
 		PathParams: map[string]string{"symbol": symbol},
 	}, &env); err != nil {
 		return nil, fmt.Errorf("%s: %w", method, err)
@@ -114,7 +116,7 @@ func (s *SkillWrapService) postUnusual(ctx context.Context, endpoint, method str
 	}, nil
 }
 
-func newSkillWrapBody(req UnusualRequest) (map[string]any, error) {
+func newSkillWrapQuery(req UnusualRequest) (url.Values, error) {
 	timeRange := req.TimeRange
 	if timeRange <= 0 {
 		timeRange = defaultUnusualTimeRange
@@ -122,17 +124,17 @@ func newSkillWrapBody(req UnusualRequest) (map[string]any, error) {
 	if timeRange > maxUnusualTimeRange {
 		return nil, fmt.Errorf("time_range must be between 1 and %d", maxUnusualTimeRange)
 	}
-	body := map[string]any{
-		"time_range":  timeRange,
-		"language_id": req.LanguageID,
+	query := url.Values{
+		"time_range":  {strconv.Itoa(timeRange)},
+		"language_id": {strconv.Itoa(req.LanguageID)},
 	}
-	if len(req.IndicatorFilters) > 0 {
-		body["indicator_filters"] = req.IndicatorFilters
+	for _, filter := range req.IndicatorFilters {
+		query.Add("indicator_filters", filter)
 	}
-	if len(req.AnalysisDimensions) > 0 {
-		body["analysis_dimensions"] = req.AnalysisDimensions
+	for _, dimension := range req.AnalysisDimensions {
+		query.Add("analysis_dimensions", dimension)
 	}
-	return body, nil
+	return query, nil
 }
 
 func parseSkillWrapData(raw json.RawMessage) (*skillWrapData, error) {
