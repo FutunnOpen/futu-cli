@@ -45,7 +45,6 @@ type contextKey int
 const (
 	// CtxKeyCommand stores the current CLI command name in the context.
 	CtxKeyCommand contextKey = iota
-	ctxKeyReportSourceRequired
 	ctxKeyPathTemplate
 )
 
@@ -97,7 +96,7 @@ func WithVersion(ver string) ClientOption {
 	return func(c *Client) { c.version = ver }
 }
 
-// WithReportSource sets the value sent in X-Fhl-Report-Source for trade mutations.
+// WithReportSource sets the value sent in X-Fhl-Report-Source on every request.
 func WithReportSource(source string) ClientOption {
 	return func(c *Client) { c.reportSource = source }
 }
@@ -168,15 +167,8 @@ func (c *Client) Call(ctx context.Context, endpoint string, opts CallOpts, resul
 		return fmt.Errorf("unknown endpoint: %s", endpoint)
 	}
 	path := resolvePathParams(ep.Path, opts.PathParams)
-	if requiresReportSource(endpoint, ep) {
-		ctx = context.WithValue(ctx, ctxKeyReportSourceRequired, true)
-	}
 	ctx = context.WithValue(ctx, ctxKeyPathTemplate, ep.Path)
 	return c.Do(ctx, ep.Method, path, opts.Params, opts.Body, result)
-}
-
-func requiresReportSource(endpoint string, ep Endpoint) bool {
-	return ep.ReportSource || strings.HasPrefix(endpoint, "quote.")
 }
 
 // resolvePathParams replaces {key} placeholders in a path template with
@@ -357,7 +349,7 @@ func (c *Client) setHeaders(req *http.Request, ctx context.Context, bodyBytes []
 	req.Header.Set(headerUserAgent, "futu/"+c.version)
 	req.Header.Set(headerClientName, c.clientName)
 	req.Header.Set(headerCliCmd, commandFromCtx(ctx))
-	c.setReportSourceHeader(req, ctx)
+	c.setReportSourceHeader(req)
 
 	if len(bodyBytes) > 0 {
 		req.Header.Set(headerContentType, contentTypeJSON)
@@ -366,9 +358,8 @@ func (c *Client) setHeaders(req *http.Request, ctx context.Context, bodyBytes []
 	c.setOAuthHeaders(req)
 }
 
-func (c *Client) setReportSourceHeader(req *http.Request, ctx context.Context) {
-	required, _ := ctx.Value(ctxKeyReportSourceRequired).(bool)
-	if required && len(c.reportSource) > 0 {
+func (c *Client) setReportSourceHeader(req *http.Request) {
+	if len(c.reportSource) > 0 {
 		req.Header.Set(headerReportSource, c.reportSource)
 	}
 }

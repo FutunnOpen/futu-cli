@@ -12,20 +12,22 @@ import (
 const (
 	headerAuthorization = "Authorization"
 	headerContentType   = "Content-Type"
+	headerReportSource  = "X-Fhl-Report-Source"
 	contentTypeJSON     = "application/json"
 	bearerPrefix        = "Bearer "
 )
 
 type Reporter struct {
-	enabled  bool
-	endpoint string
-	token    string
-	client   *http.Client
-	queue    chan Event
-	flush    chan chan struct{}
-	done     chan struct{}
-	wg       sync.WaitGroup
-	once     sync.Once
+	enabled      bool
+	endpoint     string
+	token        string
+	reportSource string
+	client       *http.Client
+	queue        chan Event
+	flush        chan chan struct{}
+	done         chan struct{}
+	wg           sync.WaitGroup
+	once         sync.Once
 }
 
 type Options struct {
@@ -33,6 +35,7 @@ type Options struct {
 	Host           string
 	Endpoint       string
 	Token          string
+	ReportSource   string
 	QueueSize      int
 	RequestTimeout time.Duration
 	HTTPClient     *http.Client
@@ -61,13 +64,14 @@ func NewReporter(opts Options) *Reporter {
 	}
 
 	r := &Reporter{
-		enabled:  opts.Enabled,
-		endpoint: endpoint,
-		token:    opts.Token,
-		client:   httpClient,
-		queue:    make(chan Event, queueSize),
-		flush:    make(chan chan struct{}),
-		done:     make(chan struct{}),
+		enabled:      opts.Enabled,
+		endpoint:     endpoint,
+		token:        opts.Token,
+		reportSource: opts.ReportSource,
+		client:       httpClient,
+		queue:        make(chan Event, queueSize),
+		flush:        make(chan chan struct{}),
+		done:         make(chan struct{}),
 	}
 	if r.enabled {
 		r.wg.Add(1)
@@ -162,6 +166,9 @@ func (r *Reporter) send(event Event) {
 		return
 	}
 	req.Header.Set(headerContentType, contentTypeJSON)
+	if len(r.reportSource) > 0 {
+		req.Header.Set(headerReportSource, r.reportSource)
+	}
 	if r.token != "" {
 		req.Header.Set(headerAuthorization, bearerPrefix+r.token)
 	}

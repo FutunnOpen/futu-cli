@@ -10,6 +10,26 @@ import (
 	"time"
 )
 
+func TestMatchUnusualRoutesUseGET(t *testing.T) {
+	cases := []struct {
+		path string
+		id   string
+	}{
+		{"/api/v1.0/quote/HK.00700/unusual/technical", "skillwrap_technical_unusual"},
+		{"/api/v1.0/quote/US.AAPL/unusual/capital", "skillwrap_financial_unusual"},
+		{"/api/v1.0/quote/US.AAPL/unusual/derivatives", "skillwrap_derivative_unusual"},
+	}
+	for _, tc := range cases {
+		got := MatchToolRoute(http.MethodGet, tc.path)
+		if got.ID != tc.id {
+			t.Fatalf("GET %s id = %q, want %q", tc.path, got.ID, tc.id)
+		}
+		if post := MatchToolRoute(http.MethodPost, tc.path); post.ID != "" {
+			t.Fatalf("POST %s matched %q", tc.path, post.ID)
+		}
+	}
+}
+
 func TestMatchToolRouteUsesMethodAndTemplate(t *testing.T) {
 	postRoute := MatchToolRoute(http.MethodPost, "/api/v1.0/accounts/123/orders")
 	if postRoute.ID != "trading_order_place" {
@@ -94,6 +114,9 @@ func TestReporterPostsEventWithBearerToken(t *testing.T) {
 		if auth := r.Header.Get(headerAuthorization); auth != "Bearer token-1" {
 			t.Fatalf("Authorization = %q, want Bearer token-1", auth)
 		}
+		if got := r.Header.Get(headerReportSource); got != "3" {
+			t.Fatalf("%s = %q, want 3", headerReportSource, got)
+		}
 		var req reportToolCallRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Fatalf("decode request: %v", err)
@@ -104,9 +127,10 @@ func TestReporterPostsEventWithBearerToken(t *testing.T) {
 	defer srv.Close()
 
 	reporter := NewReporter(Options{
-		Enabled:  true,
-		Endpoint: srv.URL,
-		Token:    "token-1",
+		Enabled:      true,
+		Endpoint:     srv.URL,
+		Token:        "token-1",
+		ReportSource: "3",
 	})
 	reporter.Report(Event{TraceID: "trace-1", ToolID: "tool-1"})
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)

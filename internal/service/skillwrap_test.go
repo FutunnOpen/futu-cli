@@ -70,6 +70,50 @@ func TestGetFinancialUnusualNoAnomaly(t *testing.T) {
 	}
 }
 
+func TestGetDerivativeUnusualQuery(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("method = %s", r.Method)
+		}
+		query := r.URL.Query()["analysis_dimensions"]
+		if len(query) != 2 || query[0] != "option_unusual" || query[1] != "option_volatility" {
+			t.Fatalf("analysis_dimensions = %#v", query)
+		}
+		if queryTime := r.URL.Query().Get("time_range"); queryTime != "30" {
+			t.Fatalf("time_range = %s", queryTime)
+		}
+		fmt.Fprint(w, `{"ret_code":0,"ret_msg":"success","data":{"code":0,"message":"","time_range":"近30个自然日","content":"options"}}`)
+	}))
+	defer server.Close()
+
+	svc := NewSkillWrapService(client.New(server.URL))
+	result, err := svc.GetDerivativeUnusual(context.Background(), UnusualRequest{
+		StockSymbol:        "US.AAPL",
+		TimeRange:          30,
+		AnalysisDimensions: []string{"option_unusual", "option_volatility"},
+	})
+	if err != nil {
+		t.Fatalf("GetDerivativeUnusual() error = %v", err)
+	}
+	if result.Content != "options" || result.Method != "get_derivative_unusual" {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestGetUnusualRejectsEmptySymbolAndLongWindow(t *testing.T) {
+	svc := NewSkillWrapService(client.New("https://example.invalid"))
+	if _, err := svc.GetTechnicalUnusual(context.Background(), UnusualRequest{}); err == nil {
+		t.Fatal("expected missing symbol error")
+	}
+	_, err := svc.GetFinancialUnusual(context.Background(), UnusualRequest{
+		StockSymbol: "HK.00700",
+		TimeRange:   366,
+	})
+	if err == nil {
+		t.Fatal("expected time_range error")
+	}
+}
+
 func TestGetDerivativeUnusualGatewayError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {

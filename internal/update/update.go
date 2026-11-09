@@ -338,11 +338,27 @@ func unsupportedPlatform(osName, arch string) error {
 	return fmt.Errorf("unsupported platform: %s/%s", osName, arch)
 }
 
+const headerReportSource = "X-Fhl-Report-Source"
+
+var reportSource string
+
+// SetReportSource sets X-Fhl-Report-Source on release check and download requests.
+func SetReportSource(source string) {
+	reportSource = source
+}
+
+func applyReportSource(req *http.Request) {
+	if len(reportSource) > 0 {
+		req.Header.Set(headerReportSource, reportSource)
+	}
+}
+
 func getBytes(ctx context.Context, url string) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
+	applyReportSource(req)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -364,6 +380,7 @@ func fetchLatestTag(ctx context.Context, latestURL string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	applyReportSource(req)
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err

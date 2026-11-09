@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -150,13 +151,19 @@ func init() {
 // initSharedState loads config, ensures auth (when needed), and initializes
 // the HTTP client and services.
 func initSharedState(cmd *cobra.Command) error {
+	source, err := reportSourceHeaderValue()
+	if err != nil {
+		return err
+	}
+	auth.SetReportSource(source)
+	update.SetReportSource(source)
+
 	if err := normalizeOutputFormat(); err != nil {
 		return err
 	}
 	if commandOrParentMatches(cmd, noConfigCommands) {
 		return nil
 	}
-	var err error
 	cfg, err = config.Load()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
@@ -229,12 +236,24 @@ func initOAuthClient() error {
 }
 
 func newRequestReporter(token string) *reporting.Reporter {
+	source, _ := reportSourceHeaderValue()
 	requestReporter = reporting.NewReporter(reporting.Options{
-		Enabled: true,
-		Host:    "",
-		Token:   token,
+		Enabled:      true,
+		Host:         "",
+		Token:        token,
+		ReportSource: source,
 	})
 	return requestReporter
+}
+
+const headerReportSource = "X-Fhl-Report-Source"
+
+func applyReportSourceHeader(req *http.Request) {
+	source, err := reportSourceHeaderValue()
+	if err != nil || len(source) == 0 {
+		return
+	}
+	req.Header.Set(headerReportSource, source)
 }
 
 func reportSourceHeaderValue() (string, error) {

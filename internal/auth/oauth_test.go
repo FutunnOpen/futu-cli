@@ -302,6 +302,38 @@ func TestPostForm_HTTPError(t *testing.T) {
 	}
 }
 
+func TestOAuthRequestsCarryReportSource(t *testing.T) {
+	previous := oauthReportSource
+	t.Cleanup(func() { oauthReportSource = previous })
+	SetReportSource("3")
+
+	var jsonHeader, formHeader string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/json":
+			jsonHeader = r.Header.Get(headerReportSource)
+		case "/form":
+			formHeader = r.Header.Get(headerReportSource)
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	if _, err := postJSON(srv.URL+"/json", map[string]string{"key": "val"}); err != nil {
+		t.Fatalf("postJSON() error = %v", err)
+	}
+	if _, err := postForm(srv.URL+"/form", url.Values{"grant_type": {"refresh_token"}}); err != nil {
+		t.Fatalf("postForm() error = %v", err)
+	}
+	if jsonHeader != "3" {
+		t.Fatalf("JSON %s = %q, want 3", headerReportSource, jsonHeader)
+	}
+	if formHeader != "3" {
+		t.Fatalf("form %s = %q, want 3", headerReportSource, formHeader)
+	}
+}
+
 func TestOAuthHTTPClientTimeout(t *testing.T) {
 	if oauthHTTPClient.Timeout != 30*time.Second {
 		t.Fatalf("OAuth HTTP timeout = %s, want %s", oauthHTTPClient.Timeout, 30*time.Second)

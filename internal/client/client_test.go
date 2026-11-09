@@ -86,33 +86,52 @@ func TestSetHeaders_CliCmdFromContext(t *testing.T) {
 	}
 }
 
-func TestEndpointMatrixRequiresReportSource(t *testing.T) {
-	reportSourceEndpoints := []string{
-		"trade.order.place",
-		"trade.order.modify",
-		"trade.order.cancel",
-		"trade.order.confirm",
-		"crypto.order.place",
-		"crypto.order.modify",
-		"crypto.order.cancel",
-		"quote.stock_quote",
-		"quote.cur_kline",
-		"quote.owner_plate",
-	}
-	for _, endpoint := range reportSourceEndpoints {
-		if !requiresReportSource(endpoint, Endpoints[endpoint]) {
-			t.Fatalf("%s must require report source header", endpoint)
-		}
-	}
+func TestCallAddsReportSourceForEveryRegisteredEndpoint(t *testing.T) {
+	for endpoint, ep := range Endpoints {
+		t.Run(endpoint, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if got := r.Header.Get(headerReportSource); got != "source-1" {
+					t.Fatalf("%s = %q, want source-1", headerReportSource, got)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{}`))
+			}))
+			defer srv.Close()
 
-	readOnlyEndpoints := []string{
-		"trade.order.open",
-		"crypto.order.active",
+			c := New(srv.URL, WithReportSource("source-1"))
+			err := c.Call(context.Background(), endpoint, CallOpts{
+				PathParams: placeholderPathParams(ep.Path),
+			}, nil)
+			if err != nil {
+				t.Fatalf("Call() error = %v", err)
+			}
+		})
 	}
-	for _, endpoint := range readOnlyEndpoints {
-		if requiresReportSource(endpoint, Endpoints[endpoint]) {
-			t.Fatalf("%s must not require report source header", endpoint)
+}
+
+func placeholderPathParams(path string) map[string]string {
+	params := map[string]string{}
+	for _, part := range strings.Split(path, "/") {
+		if strings.HasPrefix(part, "{") && strings.HasSuffix(part, "}") {
+			params[strings.Trim(part, "{}")] = "value-1"
 		}
+	}
+	return params
+}
+
+func TestDoAddsReportSource(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get(headerReportSource); got != "source-1" {
+			t.Fatalf("%s = %q, want source-1", headerReportSource, got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	c := New(srv.URL, WithReportSource("source-1"))
+	if err := c.Do(context.Background(), http.MethodGet, "/v1/accounts", nil, nil, nil); err != nil {
+		t.Fatalf("Do() error = %v", err)
 	}
 }
 
@@ -175,10 +194,10 @@ func TestCallAddsReportSourceForQuoteEndpoints(t *testing.T) {
 	}
 }
 
-func TestCallOmitsReportSourceForReadOnlyEndpoints(t *testing.T) {
+func TestCallAddsReportSourceForReadOnlyEndpoints(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got := r.Header.Get(headerReportSource); len(got) > 0 {
-			t.Fatalf("%s = %q, want empty", headerReportSource, got)
+		if got := r.Header.Get(headerReportSource); got != "source-1" {
+			t.Fatalf("%s = %q, want source-1", headerReportSource, got)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{}`))
@@ -315,6 +334,9 @@ func TestCallReportsThroughAsyncReporter(t *testing.T) {
 		if auth := r.Header.Get("Authorization"); auth != "Bearer oauth-token" {
 			t.Fatalf("Authorization = %q, want Bearer oauth-token", auth)
 		}
+		if got := r.Header.Get(headerReportSource); got != "1" {
+			t.Fatalf("%s = %q, want 1", headerReportSource, got)
+		}
 		var req capturedReportRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Fatalf("decode report request: %v", err)
@@ -331,9 +353,10 @@ func TestCallReportsThroughAsyncReporter(t *testing.T) {
 	defer businessSrv.Close()
 
 	reporter := reporting.NewReporter(reporting.Options{
-		Enabled:  true,
-		Endpoint: reportSrv.URL,
-		Token:    "oauth-token",
+		Enabled:      true,
+		Endpoint:     reportSrv.URL,
+		Token:        "oauth-token",
+		ReportSource: "1",
 	})
 	c := New(businessSrv.URL,
 		WithToken("oauth-token"),

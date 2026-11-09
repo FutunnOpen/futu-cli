@@ -97,6 +97,7 @@ func probeEndpoint(ctx context.Context, client *http.Client, endpoint string) en
 	if err != nil {
 		return endpointCheck{URL: endpoint}
 	}
+	applyReportSourceHeader(request)
 	response, err := client.Do(request)
 	elapsed := time.Since(startedAt).Milliseconds()
 	if err != nil {

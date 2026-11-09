@@ -36,12 +36,21 @@ const (
 )
 
 const (
-	clientNameSuffix = " (Futu CLI)"
-	stateBytes       = 16
-	oauthHTTPTimeout = 30 * time.Second
+	clientNameSuffix   = " (Futu CLI)"
+	stateBytes         = 16
+	oauthHTTPTimeout   = 30 * time.Second
+	headerReportSource = "X-Fhl-Report-Source"
 )
 
-var oauthHTTPClient = &http.Client{Timeout: oauthHTTPTimeout}
+var (
+	oauthHTTPClient   = &http.Client{Timeout: oauthHTTPTimeout}
+	oauthReportSource string
+)
+
+// SetReportSource sets X-Fhl-Report-Source on register, token exchange, and refresh requests.
+func SetReportSource(source string) {
+	oauthReportSource = source
+}
 
 // RegistrationResponse holds the response from the client registration endpoint.
 type RegistrationResponse struct {
@@ -267,7 +276,13 @@ func postJSON(targetURL string, payload any) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("marshal request body: %w", err)
 	}
-	resp, err := oauthHTTPClient.Post(targetURL, "application/json", bytes.NewReader(jsonBody))
+	req, err := http.NewRequest(http.MethodPost, targetURL, bytes.NewReader(jsonBody))
+	if err != nil {
+		return nil, fmt.Errorf("HTTP POST %s: %w", targetURL, err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	applyReportSource(req)
+	resp, err := oauthHTTPClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP POST %s: %w", targetURL, err)
 	}
@@ -277,12 +292,24 @@ func postJSON(targetURL string, payload any) ([]byte, error) {
 
 // postForm sends a POST request with a form-urlencoded body and returns the response bytes.
 func postForm(targetURL string, data url.Values) ([]byte, error) {
-	resp, err := oauthHTTPClient.PostForm(targetURL, data)
+	req, err := http.NewRequest(http.MethodPost, targetURL, strings.NewReader(data.Encode()))
+	if err != nil {
+		return nil, fmt.Errorf("HTTP POST %s: %w", targetURL, err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	applyReportSource(req)
+	resp, err := oauthHTTPClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP POST %s: %w", targetURL, err)
 	}
 	defer resp.Body.Close()
 	return readResponseBody(resp)
+}
+
+func applyReportSource(req *http.Request) {
+	if len(oauthReportSource) > 0 {
+		req.Header.Set(headerReportSource, oauthReportSource)
+	}
 }
 
 // readResponseBody reads the full response body and checks for HTTP-level errors.

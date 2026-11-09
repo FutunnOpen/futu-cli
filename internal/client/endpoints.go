@@ -4,9 +4,8 @@ import "net/http"
 
 // Endpoint describes a single API route: its HTTP method and URL path template.
 type Endpoint struct {
-	Method       string
-	Path         string
-	ReportSource bool
+	Method string
+	Path   string
 }
 
 // Endpoints is the single source of truth for all Futu API routes.
@@ -95,21 +94,21 @@ var Endpoints = map[string]Endpoint{
 	"sim_trade.position_list":                    {Method: http.MethodGet, Path: "/api/v1.0/sim-trade/{acc_id}/positions"},
 
 	// ── Trade ────────────────────────────────────────────────────────────
-	"trade.order.place":   {Method: http.MethodPost, Path: "/api/v1.0/accounts/{acc_id}/orders", ReportSource: true},
-	"trade.order.modify":  {Method: http.MethodPut, Path: "/api/v1.0/accounts/{acc_id}/orders/{order_id}", ReportSource: true},
-	"trade.order.cancel":  {Method: http.MethodDelete, Path: "/api/v1.0/accounts/{acc_id}/orders/{order_id}", ReportSource: true},
-	"trade.order.confirm": {Method: http.MethodPost, Path: "/api/v1.0/accounts/{acc_id}/order_confirm", ReportSource: true},
-	"trade.order.open":    {Method: http.MethodGet, Path: "/api/v1.0/accounts/{acc_id}/orders"},
-	"trade.order.history": {Method: http.MethodGet, Path: "/api/v1.0/accounts/{acc_id}/orders_history"},
-	"trade.order.detail":  {Method: http.MethodPost, Path: "/api/v1.0/accounts/{acc_id}/orders/detail"},
-	"trade.position":      {Method: http.MethodGet, Path: "/api/v1.0/accounts/{acc_id}/positions"},
-	"trade.deal.today":    {Method: http.MethodGet, Path: "/api/v1.0/accounts/{acc_id}/order_fills"},
-	"trade.deal.history":  {Method: http.MethodGet, Path: "/api/v1.0/accounts/{acc_id}/fills_history"},
-	"trade.account.list":  {Method: http.MethodGet, Path: "/api/v1.0/accounts/authorized_trd_accs"},
-	"trade.account.funds": {Method: http.MethodGet, Path: "/api/v1.0/accounts/{acc_id}/funds"},
-	"trade.account.info":  {Method: http.MethodGet, Path: "/api/v1.0/accounts/{acc_id}/acctradinginfo"},
-	"trade.order.fees":    {Method: http.MethodGet, Path: "/api/v1.0/accounts/{acc_id}/orders/{order_id}/fees"},
-	"trade.margin_ratio":  {Method: http.MethodGet, Path: "/api/v1.0/margin_ratio"},
+	"trade.order.place":       {Method: http.MethodPost, Path: "/api/v1.0/accounts/{acc_id}/orders"},
+	"trade.order.modify":      {Method: http.MethodPut, Path: "/api/v1.0/accounts/{acc_id}/orders/{order_id}"},
+	"trade.order.cancel":      {Method: http.MethodDelete, Path: "/api/v1.0/accounts/{acc_id}/orders/{order_id}"},
+	"trade.order.confirm":     {Method: http.MethodPost, Path: "/api/v1.0/accounts/{acc_id}/order_confirm"},
+	"trade.order.open":        {Method: http.MethodGet, Path: "/api/v1.0/accounts/{acc_id}/orders"},
+	"trade.order.history":     {Method: http.MethodGet, Path: "/api/v1.0/accounts/{acc_id}/orders_history"},
+	"trade.order.detail":      {Method: http.MethodPost, Path: "/api/v1.0/accounts/{acc_id}/orders/detail"},
+	"trade.position":          {Method: http.MethodGet, Path: "/api/v1.0/accounts/{acc_id}/positions"},
+	"trade.deal.today":        {Method: http.MethodGet, Path: "/api/v1.0/accounts/{acc_id}/order_fills"},
+	"trade.deal.history":      {Method: http.MethodGet, Path: "/api/v1.0/accounts/{acc_id}/fills_history"},
+	"trade.account.list":      {Method: http.MethodGet, Path: "/api/v1.0/accounts/authorized_trd_accs"},
+	"trade.account.funds":     {Method: http.MethodGet, Path: "/api/v1.0/accounts/{acc_id}/funds"},
+	"trade.account.info":      {Method: http.MethodGet, Path: "/api/v1.0/accounts/{acc_id}/acctradinginfo"},
+	"trade.order.fees":        {Method: http.MethodGet, Path: "/api/v1.0/accounts/{acc_id}/orders/{order_id}/fees"},
+	"trade.margin_ratio":      {Method: http.MethodGet, Path: "/api/v1.0/margin_ratio"},
 	"trade.account.cash_logs": {Method: http.MethodGet, Path: "/api/v1.0/accounts/{acc_id}/cash_logs"},
 
 	// ── Quote unusual summaries ──────────────────────────────────────────
@@ -120,9 +119,9 @@ var Endpoints = map[string]Endpoint{
 	// ── Crypto Trading ───────────────────────────────────────────────────
 	"crypto.account.total_balance": {Method: http.MethodGet, Path: "/api/v1/crypto/accounts/{acc_id}/total-balance"},
 	"crypto.account.max_qty":       {Method: http.MethodGet, Path: "/api/v1/crypto/accounts/{acc_id}/purchasing-power"},
-	"crypto.order.place":           {Method: http.MethodPost, Path: "/api/v1/crypto/accounts/{acc_id}/orders", ReportSource: true},
-	"crypto.order.modify":          {Method: http.MethodPut, Path: "/api/v1/crypto/accounts/{acc_id}/orders/{order_id}", ReportSource: true},
-	"crypto.order.cancel":          {Method: http.MethodDelete, Path: "/api/v1/crypto/accounts/{acc_id}/orders/{order_id}", ReportSource: true},
+	"crypto.order.place":           {Method: http.MethodPost, Path: "/api/v1/crypto/accounts/{acc_id}/orders"},
+	"crypto.order.modify":          {Method: http.MethodPut, Path: "/api/v1/crypto/accounts/{acc_id}/orders/{order_id}"},
+	"crypto.order.cancel":          {Method: http.MethodDelete, Path: "/api/v1/crypto/accounts/{acc_id}/orders/{order_id}"},
 	"crypto.order.active":          {Method: http.MethodGet, Path: "/api/v1/crypto/accounts/{acc_id}/orders"},
 	"crypto.order.history":         {Method: http.MethodGet, Path: "/api/v1/crypto/accounts/{acc_id}/orders/history"},
 	"crypto.order.detail":          {Method: http.MethodGet, Path: "/api/v1/crypto/accounts/{acc_id}/orders/{order_id}"},
