@@ -1,6 +1,6 @@
 {
   "name": "@futunn/futu-cli",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Futu command-line interface",
   "bin": {
     "futu": "npm/bin/futu"
