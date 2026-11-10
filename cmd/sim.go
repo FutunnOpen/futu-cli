@@ -56,7 +56,7 @@ const (
 	defaultSimHistoryPageSize = 50
 	simMarketHongKong         = 1
 	simMarketUnitedStates     = 100
-	simMarketUSOption         = 3
+	simMarketUSOption         = 100
 	simMarketHongKongConnect  = 4
 	simOrderTypeLimit         = 1
 	simOrderTypeMarket        = 3
