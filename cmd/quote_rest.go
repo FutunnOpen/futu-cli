@@ -52,7 +52,10 @@ func init() {
 }
 
 func loadQuoteRESTSpecs() []quoteRESTSpec {
-	return quoteRESTSpecs
+	specs := make([]quoteRESTSpec, 0, len(quoteRESTSpecs)+len(octoberQuoteSpecs))
+	specs = append(specs, quoteRESTSpecs...)
+	specs = append(specs, octoberQuoteSpecs...)
+	return specs
 }
 
 type quoteRESTAggregate struct {
