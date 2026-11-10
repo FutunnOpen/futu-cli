@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -21,8 +22,9 @@ const (
 )
 
 const (
-	accountTypeCash   = "cash"
-	accountTypeMargin = "margin"
+	accountTypeCash       = "cash"
+	accountTypeMargin     = "margin"
+	accountTypeDerivative = "derivative"
 )
 
 const (
@@ -32,6 +34,7 @@ const (
 	securityFirmFutuCA         = "FUTUCA"
 	securityFirmFutuMY         = "FUTUMY"
 	securityFirmFutuAU         = "FUTUAU"
+	securityFirmFutuJP         = "FUTUJP"
 )
 
 const (
@@ -60,6 +63,7 @@ var securityFirmNames = map[string]string{
 	securityFirmFutuCA:         "moomoo (Canada)",
 	securityFirmFutuMY:         "moomoo (Malaysia)",
 	securityFirmFutuAU:         "moomoo (Australia)",
+	securityFirmFutuJP:         "moomoo (Japan)",
 }
 
 var tradingMarketNames = map[int]string{
@@ -82,9 +86,15 @@ var tradingMarketNames = map[int]string{
 }
 
 var accountTypeNames = map[string]string{
-	accountTypeCash:   "Cash",
-	accountTypeMargin: "Margin",
+	accountTypeCash:       "Cash",
+	accountTypeMargin:     "Margin",
+	accountTypeDerivative: "Derivative",
 }
+
+const (
+	assetCategoryDomestic = "DOMESTIC"
+	assetCategoryForeign  = "FOREIGN"
+)
 
 // Table header labels for the account funds subcommand.
 const (
@@ -133,6 +143,7 @@ var accountCashLogsCmd = &cobra.Command{
 func init() {
 	accountFundsCmd.Flags().StringP("account", "a", "", "Trading account ID")
 	accountFundsCmd.Flags().StringP("currency", "c", defaultFundsCurrency, "Display currency")
+	accountFundsCmd.Flags().String("asset-category", "", "JP asset category: DOMESTIC or FOREIGN (required for JP derivative accounts; JP margin defaults to FOREIGN)")
 	accountCashLogsCmd.Flags().StringP("account", "a", "", "Trading account ID")
 	accountCashLogsCmd.Flags().Int64("begin-time", 0, "Begin time (microseconds, required)")
 	accountCashLogsCmd.Flags().Int64("end-time", 0, "End time (microseconds, required)")
@@ -208,6 +219,44 @@ func formatTradingMarkets(markets []int) string {
 	return strings.Join(values, ", ")
 }
 
+func lookupAccount(ctx context.Context, accountID string) (service.Account, bool, error) {
+	accounts, err := tradeSvc.ListAccounts(ctx)
+	if err != nil {
+		return service.Account{}, false, err
+	}
+	for _, account := range accounts {
+		if account.AccountID == accountID {
+			return account, true, nil
+		}
+	}
+	return service.Account{}, false, nil
+}
+
+func resolveAssetCategory(ctx context.Context, accountID, explicit string) (string, error) {
+	explicit = strings.ToUpper(strings.TrimSpace(explicit))
+	if explicit != "" {
+		if explicit != assetCategoryDomestic && explicit != assetCategoryForeign {
+			return "", fmt.Errorf("unsupported asset category %q; use DOMESTIC or FOREIGN", explicit)
+		}
+		return explicit, nil
+	}
+	account, found, err := lookupAccount(ctx, accountID)
+	if err != nil {
+		return "", fmt.Errorf("looking up account asset category: %w", err)
+	}
+	if !found || account.SecurityFirm != securityFirmFutuJP {
+		return "", nil
+	}
+	switch account.Type {
+	case accountTypeMargin:
+		return assetCategoryForeign, nil
+	case accountTypeDerivative:
+		return "", fmt.Errorf("JP derivative account %s requires --asset-category DOMESTIC or FOREIGN", accountID)
+	default:
+		return "", nil
+	}
+}
+
 func filterAccountsByMarket(accounts []service.Account, targetMarket int) []service.Account {
 	filtered := make([]service.Account, 0, len(accounts))
 	for _, account := range accounts {
@@ -238,12 +287,20 @@ func runAccountFunds(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("reading currency flag: %w", err)
 	}
+	assetCategory, err := cmd.Flags().GetString("asset-category")
+	if err != nil {
+		return fmt.Errorf("reading asset-category flag: %w", err)
+	}
 	account = resolveAccount(account)
 	if len(account) == 0 {
 		return fmt.Errorf("account ID is required; use --account or configure default_account")
 	}
 	ctx := cmdContext(cmd)
-	funds, err := tradeSvc.GetFunds(ctx, account, currency)
+	assetCategory, err = resolveAssetCategory(ctx, account, assetCategory)
+	if err != nil {
+		return err
+	}
+	funds, err := tradeSvc.GetFunds(ctx, account, currency, assetCategory)
 	if err != nil {
 		return fmt.Errorf("fetching funds: %w", err)
 	}

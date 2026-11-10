@@ -92,9 +92,16 @@ func TestPlaceOrderPayloadPreservesPrecisePricesAndAllFields(t *testing.T) {
 		Qty: 2, Price: "0.123456789012345678", AuxPrice: "0.100000000000000001",
 		TimeInForce: "GTC", LotType: "ODD", Remark: "test", Session: "OVERNIGHT",
 		OrderClass: "MLEG", MultiLegInfo: json.RawMessage(`{"strategy":"custom"}`),
+		PositionID:       "pos-1",
+		ExpireTime:       1814313600000000,
+		TrailType:        "RATIO",
+		TrailValue:       "0.5",
+		TrailSpread:      "1.2",
+		PositionOpenType: "ENABLE_POSITION_OPEN",
+		AlgoInfo:         json.RawMessage(`{"start_time":1798761600000000}`),
 	}
 	payload := newPlaceOrderPayload(req)
-	if payload.Price != req.Price || payload.AuxPrice != req.AuxPrice || payload.LotType != "ODD" || payload.Session != "OVERNIGHT" {
+	if payload.Price != req.Price || payload.AuxPrice != req.AuxPrice || payload.LotType != "ODD" || payload.Session != "OVERNIGHT" || payload.PositionID != "pos-1" || payload.ExpireTime != req.ExpireTime || payload.TrailType != "RATIO" || string(payload.AlgoInfo) != string(req.AlgoInfo) {
 		t.Fatalf("payload = %#v", payload)
 	}
 	if string(payload.MultiLegInfo) != string(req.MultiLegInfo) {
@@ -233,6 +240,73 @@ func TestModifyOrderReturnsConfirmationRequired(t *testing.T) {
 	}
 	if required.Account != "123" || required.ConfirmID != "confirm-2" || required.Exchange != "US" {
 		t.Fatalf("required confirmation = %#v", required)
+	}
+}
+
+func TestModifyOrderSendsTrailAndAlgo(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var body map[string]json.RawMessage
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		var trailType, trailValue, trailSpread string
+		if err := json.Unmarshal(body["trail_type"], &trailType); err != nil || trailType != "RATIO" {
+			t.Fatalf("trail_type = %s", body["trail_type"])
+		}
+		if err := json.Unmarshal(body["trail_value"], &trailValue); err != nil || trailValue != "0.5" {
+			t.Fatalf("trail_value = %s", body["trail_value"])
+		}
+		if err := json.Unmarshal(body["trail_spread"], &trailSpread); err != nil || trailSpread != "1.2" {
+			t.Fatalf("trail_spread = %s", body["trail_spread"])
+		}
+		var algo map[string]any
+		if err := json.Unmarshal(body["algo_info"], &algo); err != nil || algo["start_time"] == nil {
+			t.Fatalf("algo_info = %s", body["algo_info"])
+		}
+		fmt.Fprint(writer, `{"s":"ok"}`)
+	}))
+	defer server.Close()
+
+	tradeService := NewTradeService(client.New(server.URL))
+	_, err := tradeService.ModifyOrder(context.Background(), "987654321", ModifyOrderRequest{
+		Account: "123", Exchange: "US", Qty: 1,
+		TrailType: "RATIO", TrailValue: "0.5", TrailSpread: "1.2",
+		AlgoInfo: json.RawMessage(`{"start_time":1798761600000000}`),
+	})
+	if err != nil {
+		t.Fatalf("ModifyOrder() error = %v", err)
+	}
+}
+
+func TestPlaceOrderAcceptsTopLevelConfirmation(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(writer, `{"s":"error","errcode":108330261,"errmsg":"confirm","need_order_confirm":true,"confirm_id":"top-1"}`)
+	}))
+	defer server.Close()
+
+	tradeService := NewTradeService(client.New(server.URL))
+	_, err := tradeService.PlaceOrder(context.Background(), PlaceOrderRequest{
+		Account: "123", Code: "US.AAPL", Side: "BUY", OrderType: "LIMIT", Qty: 1, TimeInForce: "DAY",
+	})
+	required, ok := err.(*OrderConfirmationRequiredError)
+	if !ok || required.ConfirmID != "top-1" {
+		t.Fatalf("error = %T %v", err, err)
+	}
+}
+
+func TestPlaceOrderReturnsJumpURL(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(writer, `{"s":"error","errmsg":"continue on web","jump_url":"https://example.com/jump"}`)
+	}))
+	defer server.Close()
+
+	tradeService := NewTradeService(client.New(server.URL))
+	_, err := tradeService.PlaceOrder(context.Background(), PlaceOrderRequest{
+		Account: "123", Code: "US.AAPL", Side: "BUY", OrderType: "LIMIT", Qty: 1, TimeInForce: "DAY",
+	})
+	jump, ok := err.(*OrderJumpRequiredError)
+	if !ok || jump.URL != "https://example.com/jump" {
+		t.Fatalf("error = %T %v", err, err)
 	}
 }
 
@@ -443,13 +517,16 @@ func TestGetPositionsUsesAccountPathAndFilters(t *testing.T) {
 		if request.URL.Query().Get("pl_ratio_max") != "0.2" {
 			t.Errorf("pl_ratio_max = %q", request.URL.Query().Get("pl_ratio_max"))
 		}
+		if request.URL.Query().Get("asset_category") != "FOREIGN" {
+			t.Errorf("asset_category = %q", request.URL.Query().Get("asset_category"))
+		}
 		writer.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(writer, `{"s":"ok","d":{"positions":[{"position_side":"LONG","code":"US.AAPL","stock_name":"Apple Inc","qty":"100","can_sell_qty":"100","currency":"USD","nominal_price":"150.00","cost_price":"140.00","cost_price_valid":true,"market_val":"15000.00","pl_ratio":"0.0714","pl_ratio_valid":true,"pl_val":"1000.00","pl_val_valid":true,"today_pl_val":"200.00","today_trd_val":"0","today_buy_qty":"0","today_buy_val":"0","today_sell_qty":"0","today_sell_val":"0","unrealized_pl":"1000.00","realized_pl":"0"}]}}`)
+		fmt.Fprint(writer, `{"s":"ok","d":{"positions":[{"position_side":"LONG","code":"US.AAPL","stock_name":"Apple Inc","qty":"100","can_sell_qty":"100","currency":"USD","nominal_price":"150.00","cost_price":"140.00","cost_price_valid":true,"market_val":"15000.00","pl_ratio":"0.0714","pl_ratio_valid":true,"pl_val":"1000.00","pl_val_valid":true,"today_pl_val":"200.00","today_trd_val":"0","today_buy_qty":"0","today_buy_val":"0","today_sell_qty":"0","today_sell_val":"0","unrealized_pl":"1000.00","realized_pl":"0","security_type":"STOCK","position_id":"pos-9","open_time":1791538873,"sub_acc_type":"General","margin_trading_type":"GENERAL","collateral_qty":"10"}]}}`)
 	}))
 	defer server.Close()
 
 	tradeService := NewTradeService(client.New(server.URL, client.WithToken("access-token")))
-	filter := PositionFilter{Code: "US.AAPL", PLRatioMin: "-0.1", PLRatioMax: "0.2"}
+	filter := PositionFilter{Code: "US.AAPL", PLRatioMin: "-0.1", PLRatioMax: "0.2", AssetCategory: "FOREIGN"}
 	positions, err := tradeService.GetPositions(context.Background(), "123", filter)
 	if err != nil {
 		t.Fatalf("GetPositions() error = %v", err)
@@ -458,8 +535,11 @@ func TestGetPositionsUsesAccountPathAndFilters(t *testing.T) {
 		t.Fatalf("positions = %#v", positions)
 	}
 	p := positions[0]
-	if p.Code != "US.AAPL" || p.StockName != "Apple Inc" || p.PositionSide != "LONG" {
+	if p.Code != "US.AAPL" || p.StockName != "Apple Inc" || p.PositionSide != "LONG" || p.PositionID != "pos-9" {
 		t.Fatalf("position identity = %#v", p)
+	}
+	if p.SecurityType != "STOCK" || p.OpenTime != 1791538873 || p.SubAccType != "General" || p.MarginTradingType != "GENERAL" || p.CollateralQty != "10" {
+		t.Fatalf("position details = %#v", p)
 	}
 	if p.Qty != "100" || p.CostPrice != "140.00" || p.MarketVal != "15000.00" {
 		t.Fatalf("position values = %#v", p)
@@ -705,13 +785,16 @@ func TestGetFundsUsesAccountPathAndCurrency(t *testing.T) {
 		if request.URL.Query().Get("currency") != "HKD" {
 			t.Errorf("currency = %q", request.URL.Query().Get("currency"))
 		}
+		if request.URL.Query().Get("asset_category") != "FOREIGN" {
+			t.Errorf("asset_category = %q", request.URL.Query().Get("asset_category"))
+		}
 		writer.Header().Set("Content-Type", "application/json")
 		fmt.Fprint(writer, `{"s":"ok","d":{"power":"12500.00","total_assets":25000.5,"cash":"7000.00","market_val":"18000.00","currency":"HKD","available_funds":"7000.00","risk_status":"LEVEL2"}}`)
 	}))
 	defer server.Close()
 
 	tradeService := NewTradeService(client.New(server.URL))
-	funds, err := tradeService.GetFunds(context.Background(), "123", "HKD")
+	funds, err := tradeService.GetFunds(context.Background(), "123", "HKD", "FOREIGN")
 	if err != nil {
 		t.Fatalf("GetFunds() error = %v", err)
 	}
@@ -728,7 +811,7 @@ func TestGetFundsReturnsAPIBodyError(t *testing.T) {
 	defer server.Close()
 
 	tradeService := NewTradeService(client.New(server.URL))
-	_, err := tradeService.GetFunds(context.Background(), "123", "USD")
+	_, err := tradeService.GetFunds(context.Background(), "123", "USD", "")
 	if err == nil {
 		t.Fatal("expected account API error")
 	}
@@ -1035,6 +1118,15 @@ func TestGetTradingInfoUsesAccountPathAndParams(t *testing.T) {
 		if query.Get("price") != "150.250000000000000001" || query.Get("order_id") != "987654321" {
 			t.Fatalf("value query = %s", query.Encode())
 		}
+		if query.Get("sub_acc_id") != "" {
+			t.Fatalf("sub_acc_id = %q", query.Get("sub_acc_id"))
+		}
+		if query.Get("position_id") != "pos-1" {
+			t.Fatalf("position_id = %q", query.Get("position_id"))
+		}
+		if query.Get("session") != "RTH" {
+			t.Fatalf("session = %q", query.Get("session"))
+		}
 		writer.Header().Set("Content-Type", "application/json")
 		fmt.Fprint(writer, `{"s":"ok","d":{"max_cash_buy":"10","max_cash_and_margin_buy":"20","max_position_sell":"5","max_sell_short":"3","max_buy_back":"2","long_required_im":"100.00","short_required_im":"120.00"}}`)
 	}))
@@ -1042,11 +1134,13 @@ func TestGetTradingInfoUsesAccountPathAndParams(t *testing.T) {
 
 	tradeService := NewTradeService(client.New(server.URL))
 	req := TradingInfoRequest{
-		Account:   "123",
-		Code:      "US.AAPL",
-		OrderType: "LIMIT",
-		Price:     "150.250000000000000001",
-		OrderID:   "987654321",
+		Account:    "123",
+		Code:       "US.AAPL",
+		OrderType:  "LIMIT",
+		Price:      "150.250000000000000001",
+		OrderID:    "987654321",
+		PositionID: "pos-1",
+		Session:    "RTH",
 	}
 	info, err := tradeService.GetTradingInfo(context.Background(), req)
 	if err != nil {
@@ -1063,7 +1157,7 @@ func TestGetTradingInfoUsesAccountPathAndParams(t *testing.T) {
 func TestGetTradingInfoOmitsOptionalParams(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		query := request.URL.Query()
-		if query.Get("price") != "" || query.Get("order_id") != "" {
+		if query.Get("price") != "" || query.Get("order_id") != "" || query.Get("sub_acc_id") != "" || query.Get("position_id") != "" || query.Get("session") != "" {
 			t.Fatalf("unexpected optional query = %s", query.Encode())
 		}
 		writer.Header().Set("Content-Type", "application/json")
@@ -1089,6 +1183,85 @@ func TestGetTradingInfoReturnsAPIBodyError(t *testing.T) {
 	_, err := tradeService.GetTradingInfo(context.Background(), TradingInfoRequest{Account: "123"})
 	if err == nil {
 		t.Fatal("expected account API error")
+	}
+}
+
+func TestGetComboTradingInfoUsesAccountPathAndBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method != http.MethodPost {
+			t.Errorf("method = %s, want POST", request.Method)
+		}
+		if request.URL.Path != "/api/v1.0/accounts/123/combo_trading_info" {
+			t.Fatalf("path = %s", request.URL.Path)
+		}
+		var body map[string]json.RawMessage
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		if _, ok := body["order_id"]; ok {
+			t.Fatalf("order_id should be omitted")
+		}
+		var price, qty, side string
+		if err := json.Unmarshal(body["price"], &price); err != nil || price != "2.50" {
+			t.Fatalf("price = %s", body["price"])
+		}
+		if err := json.Unmarshal(body["qty"], &qty); err != nil || qty != "1" {
+			t.Fatalf("qty = %s", body["qty"])
+		}
+		if err := json.Unmarshal(body["side"], &side); err != nil || side != "BUY" {
+			t.Fatalf("side = %s", body["side"])
+		}
+		var legs map[string]any
+		if err := json.Unmarshal(body["multi_leg_info"], &legs); err != nil {
+			t.Fatalf("decode multi_leg_info: %v", err)
+		}
+		if _, ok := legs["leg_infos"]; !ok {
+			t.Fatalf("multi_leg_info = %#v", legs)
+		}
+		fmt.Fprint(writer, `{"s":"ok","d":{"option_buying_power":"50000.00","buying_power_decrease":"250.00","margin_previews":[{"name":"Initial Margin","inc_value":"250.00"}]}}`)
+	}))
+	defer server.Close()
+
+	tradeService := NewTradeService(client.New(server.URL))
+	info, err := tradeService.GetComboTradingInfo(context.Background(), ComboTradingInfoRequest{
+		Account:      "123",
+		MultiLegInfo: json.RawMessage(`{"leg_infos":[{"leg_code":"US.AAPL230120C00150000","leg_side":"BUY","leg_ratio_qty":"1"}]}`),
+		Price:        "2.50",
+		Qty:          1,
+		Side:         "BUY",
+	})
+	if err != nil {
+		t.Fatalf("GetComboTradingInfo() error = %v", err)
+	}
+	if info.OptionBuyingPower != "50000.00" || info.BuyingPowerDecrease != "250.00" {
+		t.Fatalf("combo info = %#v", info)
+	}
+	if len(info.MarginPreviews) != 1 || info.MarginPreviews[0].Name != "Initial Margin" || info.MarginPreviews[0].IncValue != "250.00" {
+		t.Fatalf("margin previews = %#v", info.MarginPreviews)
+	}
+}
+
+func TestGetComboTradingInfoIncludesOrderID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var body struct {
+			OrderID string `json:"order_id"`
+		}
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		if body.OrderID != "ord-1" {
+			t.Fatalf("order_id = %q", body.OrderID)
+		}
+		fmt.Fprint(writer, `{"s":"ok","d":{}}`)
+	}))
+	defer server.Close()
+
+	tradeService := NewTradeService(client.New(server.URL))
+	if _, err := tradeService.GetComboTradingInfo(context.Background(), ComboTradingInfoRequest{
+		Account: "123", Price: "1", Qty: 1, Side: "SELL", OrderID: "ord-1",
+		MultiLegInfo: json.RawMessage(`{"leg_infos":[]}`),
+	}); err != nil {
+		t.Fatalf("GetComboTradingInfo() error = %v", err)
 	}
 }
 

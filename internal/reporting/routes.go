@@ -23,12 +23,13 @@ var toolRoutes = []ToolRoute{
 	{ID: "account_fills_history", Method: "GET", Path: "/api/v1.0/accounts/{acc_id}/fills_history"},
 	{ID: "account_funds", Method: "GET", Path: "/api/v1.0/accounts/{acc_id}/funds"},
 	{ID: "account_trading_info", Method: "GET", Path: "/api/v1.0/accounts/{acc_id}/acctradinginfo"},
+	{ID: "account_combo_trading_info", Method: "POST", Path: "/api/v1.0/accounts/{acc_id}/combo_trading_info"},
 	{ID: "account_order_fees", Method: "GET", Path: "/api/v1.0/accounts/{acc_id}/orders/{order_id}/fees"},
 	{ID: "account_margin_ratio", Method: "GET", Path: "/api/v1.0/margin_ratio"},
 	{ID: "account_cash_logs", Method: "GET", Path: "/api/v1.0/accounts/{acc_id}/cash_logs"},
-	{ID: "skillwrap_technical_unusual", Method: "GET", Path: "/api/v1.0/quote/{symbol}/unusual/technical"},
-	{ID: "skillwrap_financial_unusual", Method: "GET", Path: "/api/v1.0/quote/{symbol}/unusual/capital"},
-	{ID: "skillwrap_derivative_unusual", Method: "GET", Path: "/api/v1.0/quote/{symbol}/unusual/derivatives"},
+	{ID: "skillwrap_technical_unusual", Method: "POST", Path: "/api/v1.0/quote/{symbol}/unusual/technical"},
+	{ID: "skillwrap_financial_unusual", Method: "POST", Path: "/api/v1.0/quote/{symbol}/unusual/capital"},
+	{ID: "skillwrap_derivative_unusual", Method: "POST", Path: "/api/v1.0/quote/{symbol}/unusual/derivatives"},
 	{ID: "account_positions", Method: "GET", Path: "/api/v1.0/accounts/{acc_id}/positions"},
 	{ID: "account_authorized_trd_accs", Method: "GET", Path: "/api/v1.0/accounts/authorized_trd_accs"},
 	{ID: "quote_market_snapshot", Method: "POST", Path: "/api/v1.0/quote/snapshot"},
@@ -171,6 +172,7 @@ func isAccountSensitivePath(path string) bool {
 		"/funds",
 		"/positions",
 		"/acctradinginfo",
+		"/combo_trading_info",
 	}
 	for _, segment := range sensitiveSegments {
 		if strings.Contains(path, segment) {

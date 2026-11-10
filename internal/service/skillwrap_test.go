@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -10,26 +11,26 @@ import (
 	"github.com/futunn/futu/internal/client"
 )
 
-func TestGetTechnicalUnusualUsesQuery(t *testing.T) {
+func TestGetTechnicalUnusualUsesBody(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
+		if r.Method != http.MethodPost {
 			t.Fatalf("method = %s", r.Method)
 		}
 		if r.URL.Path != "/api/v1.0/quote/HK.00700/unusual/technical" {
 			t.Fatalf("path = %s", r.URL.Path)
 		}
-		if r.ContentLength > 0 {
-			t.Fatalf("GET request must not send a body")
-		}
-		query := r.URL.Query()
-		if query.Get("time_range") != "7" || query.Get("language_id") != "0" {
+		if r.URL.RawQuery != "" {
 			t.Fatalf("query = %s", r.URL.RawQuery)
 		}
-		if query.Get("stock_symbol") != "" {
-			t.Fatalf("symbol must be a path parameter, query = %s", r.URL.RawQuery)
+		var body unusualPayload
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode body: %v", err)
 		}
-		if got := query["indicator_filters"]; len(got) != 1 || got[0] != "MACD" {
-			t.Fatalf("indicator_filters = %#v", got)
+		if body.TimeRange != 7 || body.LanguageID != 0 {
+			t.Fatalf("body = %#v", body)
+		}
+		if len(body.IndicatorFilters) != 1 || body.IndicatorFilters[0] != "MACD" {
+			t.Fatalf("indicator_filters = %#v", body.IndicatorFilters)
 		}
 		fmt.Fprint(w, `{"ret_code":0,"ret_msg":"success","data":{"code":0,"message":"","time_range":"2026.1.1-2026.1.8","content":"ok"}}`)
 	}))
@@ -50,7 +51,7 @@ func TestGetTechnicalUnusualUsesQuery(t *testing.T) {
 
 func TestGetFinancialUnusualNoAnomaly(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
+		if r.Method != http.MethodPost {
 			t.Fatalf("method = %s", r.Method)
 		}
 		if r.URL.Path != "/api/v1.0/quote/US.AAPL/unusual/capital" {
@@ -70,17 +71,20 @@ func TestGetFinancialUnusualNoAnomaly(t *testing.T) {
 	}
 }
 
-func TestGetDerivativeUnusualQuery(t *testing.T) {
+func TestGetDerivativeUnusualBody(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
+		if r.Method != http.MethodPost {
 			t.Fatalf("method = %s", r.Method)
 		}
-		query := r.URL.Query()["analysis_dimensions"]
-		if len(query) != 2 || query[0] != "option_unusual" || query[1] != "option_volatility" {
-			t.Fatalf("analysis_dimensions = %#v", query)
+		var body unusualPayload
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode body: %v", err)
 		}
-		if queryTime := r.URL.Query().Get("time_range"); queryTime != "30" {
-			t.Fatalf("time_range = %s", queryTime)
+		if len(body.AnalysisDimensions) != 2 || body.AnalysisDimensions[0] != "option_unusual" || body.AnalysisDimensions[1] != "option_volatility" {
+			t.Fatalf("analysis_dimensions = %#v", body.AnalysisDimensions)
+		}
+		if body.TimeRange != 30 {
+			t.Fatalf("time_range = %d", body.TimeRange)
 		}
 		fmt.Fprint(w, `{"ret_code":0,"ret_msg":"success","data":{"code":0,"message":"","time_range":"近30个自然日","content":"options"}}`)
 	}))
@@ -116,7 +120,7 @@ func TestGetUnusualRejectsEmptySymbolAndLongWindow(t *testing.T) {
 
 func TestGetDerivativeUnusualGatewayError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
+		if r.Method != http.MethodPost {
 			t.Fatalf("method = %s", r.Method)
 		}
 		if r.URL.Path != "/api/v1.0/quote/HK.00700/unusual/derivatives" {

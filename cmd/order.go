@@ -92,15 +92,28 @@ var orderSideLabels = map[string]string{
 }
 
 var orderTypeLabels = map[string]string{
-	"LIMIT":             "Limit",
-	"MARKET":            "Market",
-	"AUCTION":           "Auction Market",
-	"AUCTION_LIMIT":     "Auction Limit",
-	"STOP":              "Stop",
-	"STOP_LIMIT":        "Stop Limit",
-	"MARKET_IF_TOUCHED": "Market If Touched",
-	"LIMIT_IF_TOUCHED":  "Limit If Touched",
-	orderTypeModified:   "Modified",
+	"LIMIT":               "Limit",
+	"MARKET":              "Market",
+	"AUCTION":             "Auction Market",
+	"AUCTION_LIMIT":       "Auction Limit",
+	"STOP":                "Stop",
+	"STOP_LIMIT":          "Stop Limit",
+	"MARKET_IF_TOUCHED":   "Market If Touched",
+	"LIMIT_IF_TOUCHED":    "Limit If Touched",
+	"TRAILING_STOP":       "Trailing Stop",
+	"TRAILING_STOP_LIMIT": "Trailing Stop Limit",
+	"TWAP":                "TWAP",
+	"TWAP_LIMIT":          "TWAP Limit",
+	"VWAP":                "VWAP",
+	"VWAP_LIMIT":          "VWAP Limit",
+	"POV":                 "POV",
+	"POV_LIMIT":           "POV Limit",
+	"SLICER":              "Slicer",
+	"SLICER_LIMIT":        "Slicer Limit",
+	"PEG":                 "PEG",
+	"PEG_LIMIT":           "PEG Limit",
+	"ICEBERG_LIMIT":       "Iceberg Limit",
+	orderTypeModified:     "Modified",
 }
 
 var orderStatusLabels = map[string]string{
@@ -118,26 +131,33 @@ var orderStatusLabels = map[string]string{
 
 // orderFlags holds shared flag values for order subcommands.
 var orderFlags struct {
-	price        string
-	auxPrice     string
-	qty          int64
-	typ          string
-	account      string
-	exchange     string
-	orderID      string
-	market       string
-	pageSize     int
-	start        int64
-	end          int64
-	symbol       string
-	side         string
-	timeInForce  string
-	lotType      string
-	remark       string
-	session      string
-	orderClass   string
-	multiLegInfo string
-	execute      string
+	price            string
+	auxPrice         string
+	qty              int64
+	typ              string
+	account          string
+	exchange         string
+	orderID          string
+	market           string
+	pageSize         int
+	start            int64
+	end              int64
+	symbol           string
+	side             string
+	timeInForce      string
+	lotType          string
+	remark           string
+	session          string
+	orderClass       string
+	multiLegInfo     string
+	execute          string
+	positionID       string
+	expireTime       int64
+	trailType        string
+	trailValue       string
+	trailSpread      string
+	positionOpenType string
+	algoInfo         string
 }
 
 var orderCmd = &cobra.Command{
@@ -222,10 +242,18 @@ var orderMaxQtyCmd = &cobra.Command{
 	RunE:  runMaxOrderQty,
 }
 
+var orderComboInfoCmd = &cobra.Command{
+	Use:   "combo-info <qty>",
+	Short: "Preview combo options buying power and margin",
+	Long:  "Query available options buying power and margin preview for a combo order. Not supported for JP brokers. Pass the same multi-leg info, price, quantity, and side that will be used to place the order. Pass --order-id when previewing a modification.",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runComboInfo,
+}
+
 var orderFeesCmd = &cobra.Command{
 	Use:   "fees <order-id>",
 	Short: "Query order fee breakdown",
-	Long:  "Get fee details for a single order on the current or selected account.",
+	Long:  "Get fee details for a single order on the current or selected account. Canadian broker accounts and forex orders are not supported.",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runOrderFees,
 }
@@ -240,6 +268,7 @@ func init() {
 	registerHistoryOrderFlags(orderHistoryCmd)
 	registerDetailOrderFlags(orderDetailCmd)
 	registerMaxQtyFlags(orderMaxQtyCmd)
+	registerComboInfoFlags(orderComboInfoCmd)
 	registerExecuteFlag(orderBuyCmd, &orderFlags.execute)
 	registerExecuteFlag(orderSellCmd, &orderFlags.execute)
 	registerExecuteFlag(orderPlaceCmd, &orderFlags.execute)
@@ -247,7 +276,7 @@ func init() {
 	registerExecuteFlag(orderCancelCmd, &orderFlags.execute)
 	orderFeesCmd.Flags().StringP("account", "a", "", "Trading account ID")
 
-	orderCmd.AddCommand(orderBuyCmd, orderSellCmd, orderPlaceCmd, orderModifyCmd, orderCancelCmd, orderListCmd, orderHistoryCmd, orderDetailCmd, orderMaxQtyCmd, orderFeesCmd)
+	orderCmd.AddCommand(orderBuyCmd, orderSellCmd, orderPlaceCmd, orderModifyCmd, orderCancelCmd, orderListCmd, orderHistoryCmd, orderDetailCmd, orderMaxQtyCmd, orderComboInfoCmd, orderFeesCmd)
 	rootCmd.AddCommand(orderCmd)
 }
 
@@ -272,13 +301,20 @@ func registerPlaceFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&orderFlags.price, "price", "", "Order price string (default: empty; omit for market orders)")
 	cmd.Flags().StringVarP(&orderFlags.typ, "type", "t", defaultOrderType, "Order type (default: market)")
 	cmd.Flags().StringVarP(&orderFlags.account, "account", "a", "", "Trading account ID (default: config default_account)")
-	cmd.Flags().StringVar(&orderFlags.timeInForce, "time-in-force", defaultTimeInForce, "Time in force: DAY, GTC (default: DAY)")
-	cmd.Flags().StringVar(&orderFlags.lotType, "lot-type", "", "HK stock lot type: ROUND, ODD (default: empty, decided by backend)")
+	cmd.Flags().StringVar(&orderFlags.timeInForce, "time-in-force", defaultTimeInForce, "Time in force: DAY, GTC, GTD, IOC, FOK (default: DAY)")
+	cmd.Flags().Int64Var(&orderFlags.expireTime, "expire-time", 0, "GTD expiry as a microsecond timestamp (required when time-in-force is GTD)")
+	cmd.Flags().StringVar(&orderFlags.lotType, "lot-type", "", "HK or JP stock lot type: ROUND, ODD (default: empty, decided by backend)")
 	cmd.Flags().StringVar(&orderFlags.remark, "remark", "", "Order remark, up to 64 bytes (default: empty)")
 	cmd.Flags().StringVar(&orderFlags.session, "session", "", "Trading session: RTH, RTH+Pre/Post-Mkt, OVERNIGHT, ALL_DAY (default: empty, decided by backend)")
 	cmd.Flags().StringVar(&orderFlags.auxPrice, "aux-price", "", "Conditional trigger price string (default: empty)")
 	cmd.Flags().StringVar(&orderFlags.orderClass, "order-class", "", "Order class: MLEG (default: empty for normal orders)")
 	cmd.Flags().StringVar(&orderFlags.multiLegInfo, "multi-leg-info", "", "Multi-leg order JSON object (default: empty)")
+	cmd.Flags().StringVar(&orderFlags.positionID, "position-id", "", "Position ID to close. Required for forex SELL and BUY_BACK; optional otherwise")
+	cmd.Flags().StringVar(&orderFlags.trailType, "trail-type", "", "Trailing type: RATIO, AMOUNT (required for trailing stop orders)")
+	cmd.Flags().StringVar(&orderFlags.trailValue, "trail-value", "", "Trailing amount or ratio. For RATIO, 0.5 means 0.5%")
+	cmd.Flags().StringVar(&orderFlags.trailSpread, "trail-spread", "", "Trailing spread (required for TRAILING_STOP_LIMIT)")
+	cmd.Flags().StringVar(&orderFlags.positionOpenType, "position-open-type", "", "Trailing stop open type: DISABLE_POSITION_OPEN, ENABLE_POSITION_OPEN")
+	cmd.Flags().StringVar(&orderFlags.algoInfo, "algo-info", "", "Algo order JSON object (required for algo order types)")
 }
 
 // registerListOrderFlags adds flags for the list orders command.
@@ -310,6 +346,10 @@ func registerModifyFlags(cmd *cobra.Command) {
 	cmd.Flags().Int64Var(&orderFlags.qty, "qty", 0, "New order quantity (required)")
 	cmd.Flags().StringVar(&orderFlags.price, "price", "", "New order price string (required for limit orders; default: unchanged)")
 	cmd.Flags().StringVar(&orderFlags.auxPrice, "aux-price", "", "New trigger price string for conditional orders (default: unchanged)")
+	cmd.Flags().StringVar(&orderFlags.trailType, "trail-type", "", "New trailing type: RATIO, AMOUNT (trailing stop orders only)")
+	cmd.Flags().StringVar(&orderFlags.trailValue, "trail-value", "", "New trailing amount or ratio (trailing stop orders only)")
+	cmd.Flags().StringVar(&orderFlags.trailSpread, "trail-spread", "", "New trailing spread (TRAILING_STOP_LIMIT only)")
+	cmd.Flags().StringVar(&orderFlags.algoInfo, "algo-info", "", "New algo order JSON object")
 	cmd.Flags().StringVar(&orderFlags.exchange, "exchange", "", "Exchange code (required, for example HK or US)")
 	cmd.Flags().StringVarP(&orderFlags.account, "account", "a", "", "Trading account ID (default: config default_account)")
 	_ = cmd.MarkFlagRequired("qty")
@@ -323,9 +363,22 @@ func registerCancelFlags(cmd *cobra.Command) {
 	_ = cmd.MarkFlagRequired("exchange")
 }
 
+func registerComboInfoFlags(cmd *cobra.Command) {
+	cmd.Flags().StringVar(&orderFlags.multiLegInfo, "multi-leg-info", "", "Multi-leg combo JSON object (required)")
+	cmd.Flags().StringVar(&orderFlags.price, "price", "", "Order price string (required)")
+	cmd.Flags().StringVar(&orderFlags.side, "side", "", "Order side: BUY, SELL, SELL_SHORT, BUY_BACK (required)")
+	cmd.Flags().StringVar(&orderFlags.orderID, "order-id", "", "Existing combo order ID when previewing a modification (default: empty)")
+	cmd.Flags().StringVarP(&orderFlags.account, "account", "a", "", "Trading account ID (default: config default_account)")
+	_ = cmd.MarkFlagRequired("multi-leg-info")
+	_ = cmd.MarkFlagRequired("price")
+	_ = cmd.MarkFlagRequired("side")
+}
+
 // registerMaxQtyFlags adds flags for the max-qty command.
 func registerMaxQtyFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&orderFlags.price, "price", "", "Reference price string (required for non-market orders; default: empty)")
+	cmd.Flags().StringVar(&orderFlags.positionID, "position-id", "", "Position ID. When set, max sell and buy-back are calculated for this position")
+	cmd.Flags().StringVar(&orderFlags.session, "session", "", "Trading session: RTH, RTH+Pre/Post-Mkt, OVERNIGHT, ALL_DAY (default: empty)")
 	cmd.Flags().StringVarP(&orderFlags.typ, "type", "t", defaultOrderType, "Order type: limit, market (default: market)")
 	cmd.Flags().StringVar(&orderFlags.orderID, "order-id", "", "Original order ID for order modification scenarios (default: empty)")
 	cmd.Flags().StringVarP(&orderFlags.account, "account", "a", "", "Trading account ID (default: config default_account)")
@@ -366,14 +419,34 @@ func runGenericPlaceOrder(cmd *cobra.Command, args []string) error {
 }
 
 func placeOrderPreview(req service.PlaceOrderRequest) map[string]any {
-	return map[string]any{
-		"side":    req.Side,
-		"symbol":  req.Code,
-		"qty":     req.Qty,
-		"type":    req.OrderType,
-		"price":   req.Price,
-		"account": req.Account,
+	preview := map[string]any{
+		"side":        req.Side,
+		"symbol":      req.Code,
+		"qty":         req.Qty,
+		"type":        req.OrderType,
+		"price":       req.Price,
+		"account":     req.Account,
+		"position_id": req.PositionID,
 	}
+	if req.ExpireTime > 0 {
+		preview["expire_time"] = req.ExpireTime
+	}
+	if req.TrailType != "" {
+		preview["trail_type"] = req.TrailType
+	}
+	if req.TrailValue != "" {
+		preview["trail_value"] = req.TrailValue
+	}
+	if req.TrailSpread != "" {
+		preview["trail_spread"] = req.TrailSpread
+	}
+	if req.PositionOpenType != "" {
+		preview["position_open_type"] = req.PositionOpenType
+	}
+	if len(req.AlgoInfo) > 0 {
+		preview["algo_info"] = json.RawMessage(req.AlgoInfo)
+	}
+	return preview
 }
 
 func buildPlaceOrderRequest(rawSymbol, rawQty, side string) (service.PlaceOrderRequest, error) {
@@ -430,11 +503,114 @@ func applyPlaceOrderFlags(req *service.PlaceOrderRequest, rawSymbol, side string
 	}
 	req.Code, req.Side, req.OrderType = code, orderSide, orderType
 	req.Price, req.AuxPrice = price, auxPrice
-	req.TimeInForce = strings.ToUpper(strings.TrimSpace(orderFlags.timeInForce))
 	req.LotType, req.Remark = strings.ToUpper(strings.TrimSpace(orderFlags.lotType)), orderFlags.remark
-	req.Session = strings.TrimSpace(orderFlags.session)
 	req.OrderClass, req.MultiLegInfo = strings.ToUpper(strings.TrimSpace(orderFlags.orderClass)), multiLegInfo
+	req.PositionID = strings.TrimSpace(orderFlags.positionID)
+	return applyPlaceOrderExtras(req)
+}
+
+func applyPlaceOrderExtras(req *service.PlaceOrderRequest) error {
+	timeInForce, err := normalizeTimeInForce(orderFlags.timeInForce)
+	if err != nil {
+		return err
+	}
+	session, err := normalizeTradingSession(orderFlags.session)
+	if err != nil {
+		return err
+	}
+	trailType, err := normalizeChoice(orderFlags.trailType, "trail type", "RATIO", "AMOUNT")
+	if err != nil {
+		return err
+	}
+	trailValue, err := normalizeOptionalDecimal(orderFlags.trailValue, "trail-value")
+	if err != nil {
+		return err
+	}
+	trailSpread, err := normalizeOptionalDecimal(orderFlags.trailSpread, "trail-spread")
+	if err != nil {
+		return err
+	}
+	openType, err := normalizeChoice(orderFlags.positionOpenType, "position open type", "DISABLE_POSITION_OPEN", "ENABLE_POSITION_OPEN")
+	if err != nil {
+		return err
+	}
+	algoInfo, err := parseOptionalJSONObject(orderFlags.algoInfo, "algo-info")
+	if err != nil {
+		return err
+	}
+	if orderFlags.expireTime < 0 {
+		return fmt.Errorf("expire-time must be a microsecond timestamp")
+	}
+	if timeInForce == "GTD" && orderFlags.expireTime == 0 {
+		return fmt.Errorf("expire-time is required when time-in-force is GTD")
+	}
+	req.TimeInForce = timeInForce
+	req.Session = session
+	req.ExpireTime = uint64(orderFlags.expireTime)
+	req.TrailType = trailType
+	req.TrailValue = trailValue
+	req.TrailSpread = trailSpread
+	req.PositionOpenType = openType
+	req.AlgoInfo = algoInfo
 	return nil
+}
+
+func normalizeTimeInForce(value string) (string, error) {
+	if strings.TrimSpace(value) == "" {
+		value = defaultTimeInForce
+	}
+	return normalizeChoice(value, "time in force", "DAY", "GTC", "GTD", "IOC", "FOK")
+}
+
+func normalizeTradingSession(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", nil
+	}
+	switch value {
+	case "RTH", "RTH+Pre/Post-Mkt", "OVERNIGHT", "ALL_DAY":
+		return value, nil
+	default:
+		return "", fmt.Errorf("unsupported trading session %q", value)
+	}
+}
+
+func normalizeChoice(value, name string, allowed ...string) (string, error) {
+	normalized := strings.ToUpper(strings.TrimSpace(value))
+	if normalized == "" {
+		return "", nil
+	}
+	for _, candidate := range allowed {
+		if normalized == candidate {
+			return normalized, nil
+		}
+	}
+	return "", fmt.Errorf("unsupported %s %q", name, value)
+}
+
+func normalizeOptionalDecimal(value, name string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", nil
+	}
+	parsed, err := strconv.ParseFloat(value, qtyParseBitSize)
+	if err != nil || parsed <= 0 || math.IsInf(parsed, 0) || math.IsNaN(parsed) {
+		return "", fmt.Errorf("invalid %s: must be a positive number", name)
+	}
+	return value, nil
+}
+
+func parseOptionalJSONObject(value, name string) (json.RawMessage, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil, nil
+	}
+	data := json.RawMessage(value)
+	var object map[string]any
+	if !json.Valid(data) || json.Unmarshal(data, &object) != nil || object == nil {
+		return nil, fmt.Errorf("%s must be a JSON object", name)
+	}
+	return data, nil
 }
 
 func normalizePriceString(value string) (string, error) {
@@ -541,15 +717,7 @@ func runModifyOrder(cmd *cobra.Command, args []string) error {
 	proceed, err := gateTradeExecution(
 		dryrun.Replace(args[0], formatQty(req.Qty), req.Price),
 		orderFlags.execute,
-		map[string]any{
-			"action":    "modify",
-			"order_id":  args[0],
-			"qty":       req.Qty,
-			"price":     req.Price,
-			"aux_price": req.AuxPrice,
-			"exchange":  req.Exchange,
-			"account":   req.Account,
-		},
+		modifyOrderPreview(args[0], req),
 	)
 	if err != nil || !proceed {
 		return err
@@ -621,13 +789,58 @@ func buildModifyOrderRequest() (service.ModifyOrderRequest, error) {
 	if err != nil {
 		return service.ModifyOrderRequest{}, fmt.Errorf("invalid aux-price: %w", err)
 	}
+	trailType, err := normalizeChoice(orderFlags.trailType, "trail type", "RATIO", "AMOUNT")
+	if err != nil {
+		return service.ModifyOrderRequest{}, err
+	}
+	trailValue, err := normalizeOptionalDecimal(orderFlags.trailValue, "trail-value")
+	if err != nil {
+		return service.ModifyOrderRequest{}, err
+	}
+	trailSpread, err := normalizeOptionalDecimal(orderFlags.trailSpread, "trail-spread")
+	if err != nil {
+		return service.ModifyOrderRequest{}, err
+	}
+	algoInfo, err := parseOptionalJSONObject(orderFlags.algoInfo, "algo-info")
+	if err != nil {
+		return service.ModifyOrderRequest{}, err
+	}
 	return service.ModifyOrderRequest{
-		Account:  account,
-		Exchange: strings.ToUpper(strings.TrimSpace(orderFlags.exchange)),
-		Qty:      orderFlags.qty,
-		Price:    price,
-		AuxPrice: auxPrice,
+		Account:     account,
+		Exchange:    strings.ToUpper(strings.TrimSpace(orderFlags.exchange)),
+		Qty:         orderFlags.qty,
+		Price:       price,
+		AuxPrice:    auxPrice,
+		TrailType:   trailType,
+		TrailValue:  trailValue,
+		TrailSpread: trailSpread,
+		AlgoInfo:    algoInfo,
 	}, nil
+}
+
+func modifyOrderPreview(orderID string, req service.ModifyOrderRequest) map[string]any {
+	preview := map[string]any{
+		"action":    "modify",
+		"order_id":  orderID,
+		"qty":       req.Qty,
+		"price":     req.Price,
+		"aux_price": req.AuxPrice,
+		"exchange":  req.Exchange,
+		"account":   req.Account,
+	}
+	if req.TrailType != "" {
+		preview["trail_type"] = req.TrailType
+	}
+	if req.TrailValue != "" {
+		preview["trail_value"] = req.TrailValue
+	}
+	if req.TrailSpread != "" {
+		preview["trail_spread"] = req.TrailSpread
+	}
+	if len(req.AlgoInfo) > 0 {
+		preview["algo_info"] = json.RawMessage(req.AlgoInfo)
+	}
+	return preview
 }
 
 // renderSingleOrder writes a single order as a formatted table to stdout.
@@ -850,13 +1063,77 @@ func renderOrderFeesTable(fees *service.OrderFees) {
 	fmt.Fprintf(os.Stdout, "Total: %s %s (order %s)\n", fees.TotalFee, fees.Currency, fees.OrderID)
 }
 
+func runComboInfo(cmd *cobra.Command, args []string) error {
+	req, err := buildComboTradingInfoRequest(args[0])
+	if err != nil {
+		return err
+	}
+	info, err := tradeSvc.GetComboTradingInfo(cmdContext(cmd), req)
+	if err != nil {
+		return fmt.Errorf("querying combo trading info: %w", err)
+	}
+	printResult(info, func() {
+		renderComboTradingInfo(info)
+	})
+	return nil
+}
+
+func buildComboTradingInfoRequest(rawQty string) (service.ComboTradingInfoRequest, error) {
+	qty, err := strconv.ParseInt(rawQty, qtyParseBase, qtyParseBitSize)
+	if err != nil || qty <= 0 {
+		return service.ComboTradingInfoRequest{}, fmt.Errorf("quantity must be greater than 0")
+	}
+	account := resolveAccount(orderFlags.account)
+	if len(account) == 0 {
+		return service.ComboTradingInfoRequest{}, fmt.Errorf("account ID is required; use --account or configure default_account")
+	}
+	side, err := normalizeOrderSide(orderFlags.side)
+	if err != nil {
+		return service.ComboTradingInfoRequest{}, err
+	}
+	price, err := normalizePriceString(orderFlags.price)
+	if err != nil || price == "" {
+		return service.ComboTradingInfoRequest{}, fmt.Errorf("price is required")
+	}
+	multiLegInfo, err := parseMultiLegInfo(orderFlags.multiLegInfo)
+	if err != nil {
+		return service.ComboTradingInfoRequest{}, err
+	}
+	if len(multiLegInfo) == 0 {
+		return service.ComboTradingInfoRequest{}, fmt.Errorf("multi-leg-info is required")
+	}
+	return service.ComboTradingInfoRequest{
+		Account:      account,
+		MultiLegInfo: multiLegInfo,
+		Price:        price,
+		Qty:          qty,
+		Side:         side,
+		OrderID:      strings.TrimSpace(orderFlags.orderID),
+	}, nil
+}
+
+func renderComboTradingInfo(info *service.ComboTradingInfo) {
+	tw := output.NewTableWriter(os.Stdout, tradingInfoHeaderKey, tradingInfoHeaderValue)
+	tw.AddRow("Option Buying Power", string(info.OptionBuyingPower))
+	tw.AddRow("Buying Power Decrease", string(info.BuyingPowerDecrease))
+	tw.Render()
+	if len(info.MarginPreviews) == 0 {
+		return
+	}
+	fmt.Fprintln(os.Stdout)
+	previews := output.NewTableWriter(os.Stdout, "Margin Item", "Change")
+	for _, preview := range info.MarginPreviews {
+		previews.AddRow(preview.Name, string(preview.IncValue))
+	}
+	previews.Render()
+}
+
 func runMaxOrderQty(cmd *cobra.Command, args []string) error {
 	req, err := buildTradingInfoRequest(args[0])
 	if err != nil {
 		return err
 	}
-	ctx := cmdContext(cmd)
-	info, err := tradeSvc.GetTradingInfo(ctx, req)
+	info, err := tradeSvc.GetTradingInfo(cmdContext(cmd), req)
 	if err != nil {
 		return fmt.Errorf("querying max order quantity: %w", err)
 	}
@@ -883,12 +1160,18 @@ func buildTradingInfoRequest(rawSymbol string) (service.TradingInfoRequest, erro
 	if err != nil {
 		return service.TradingInfoRequest{}, fmt.Errorf("invalid price: %w", err)
 	}
+	session, err := normalizeTradingSession(orderFlags.session)
+	if err != nil {
+		return service.TradingInfoRequest{}, err
+	}
 	return service.TradingInfoRequest{
-		Account:   account,
-		Code:      sym.FutuCode(),
-		OrderType: orderType,
-		Price:     price,
-		OrderID:   strings.TrimSpace(orderFlags.orderID),
+		Account:    account,
+		Code:       sym.FutuCode(),
+		OrderType:  orderType,
+		Price:      price,
+		OrderID:    strings.TrimSpace(orderFlags.orderID),
+		PositionID: strings.TrimSpace(orderFlags.positionID),
+		Session:    session,
 	}, nil
 }
 

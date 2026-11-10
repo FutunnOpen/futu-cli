@@ -13,23 +13,24 @@ import (
 
 // Endpoint names for trade API routes.
 const (
-	endpointOrderPlace   = "trade.order.place"
-	endpointOrderModify  = "trade.order.modify"
-	endpointOrderCancel  = "trade.order.cancel"
-	endpointOrderConfirm = "trade.order.confirm"
-	endpointOrderOpen    = "trade.order.open"
-	endpointOrderHistory = "trade.order.history"
-	endpointOrderDetail  = "trade.order.detail"
-	endpointPosition     = "trade.position"
-	endpointDealToday    = "trade.deal.today"
-	endpointDealHistory  = "trade.deal.history"
-	endpointAccountList  = "trade.account.list"
-	endpointAccountFund   = "trade.account.funds"
-	endpointAccountInfo   = "trade.account.info"
-	endpointOrderFees     = "trade.order.fees"
-	endpointMarginRatio   = "trade.margin_ratio"
+	endpointOrderPlace      = "trade.order.place"
+	endpointOrderModify     = "trade.order.modify"
+	endpointOrderCancel     = "trade.order.cancel"
+	endpointOrderConfirm    = "trade.order.confirm"
+	endpointOrderOpen       = "trade.order.open"
+	endpointOrderHistory    = "trade.order.history"
+	endpointOrderDetail     = "trade.order.detail"
+	endpointPosition        = "trade.position"
+	endpointDealToday       = "trade.deal.today"
+	endpointDealHistory     = "trade.deal.history"
+	endpointAccountList     = "trade.account.list"
+	endpointAccountFund     = "trade.account.funds"
+	endpointAccountInfo     = "trade.account.info"
+	endpointComboInfo       = "trade.combo.info"
+	endpointOrderFees       = "trade.order.fees"
+	endpointMarginRatio     = "trade.margin_ratio"
 	endpointAccountCashLogs = "trade.account.cash_logs"
-	accountAPIStatusOK    = "ok"
+	accountAPIStatusOK      = "ok"
 
 	defaultCashLogsPageSize = 10
 	maxCashLogsPageSize     = 20
@@ -181,50 +182,72 @@ var canonicalDealFields = map[string]bool{
 
 // PlaceOrderRequest is the payload for placing a new order.
 type PlaceOrderRequest struct {
-	Account      string          `json:"-"`
-	Code         string          `json:"code"`
-	Side         string          `json:"side"`
-	OrderType    string          `json:"order_type"`
-	Price        string          `json:"-"`
-	Qty          int64           `json:"-"`
-	TimeInForce  string          `json:"time_in_force"`
-	LotType      string          `json:"lot_type,omitempty"`
-	Remark       string          `json:"remark,omitempty"`
-	Session      string          `json:"session,omitempty"`
-	AuxPrice     string          `json:"-"`
-	OrderClass   string          `json:"order_class,omitempty"`
-	MultiLegInfo json.RawMessage `json:"multi_leg_info,omitempty"`
+	Account          string          `json:"-"`
+	Code             string          `json:"code"`
+	Side             string          `json:"side"`
+	OrderType        string          `json:"order_type"`
+	Price            string          `json:"-"`
+	Qty              int64           `json:"-"`
+	TimeInForce      string          `json:"time_in_force"`
+	LotType          string          `json:"lot_type,omitempty"`
+	Remark           string          `json:"remark,omitempty"`
+	Session          string          `json:"session,omitempty"`
+	AuxPrice         string          `json:"-"`
+	OrderClass       string          `json:"order_class,omitempty"`
+	MultiLegInfo     json.RawMessage `json:"multi_leg_info,omitempty"`
+	PositionID       string          `json:"-"`
+	ExpireTime       uint64          `json:"-"`
+	TrailType        string          `json:"-"`
+	TrailValue       string          `json:"-"`
+	TrailSpread      string          `json:"-"`
+	PositionOpenType string          `json:"-"`
+	AlgoInfo         json.RawMessage `json:"-"`
 }
 
 type placeOrderPayload struct {
-	Code         string          `json:"code,omitempty"`
-	Side         string          `json:"side"`
-	OrderType    string          `json:"order_type"`
-	Qty          string          `json:"qty"`
-	Price        string          `json:"price,omitempty"`
-	TimeInForce  string          `json:"time_in_force"`
-	LotType      string          `json:"lot_type,omitempty"`
-	Remark       string          `json:"remark,omitempty"`
-	Session      string          `json:"session,omitempty"`
-	AuxPrice     string          `json:"aux_price,omitempty"`
-	OrderClass   string          `json:"order_class,omitempty"`
-	MultiLegInfo json.RawMessage `json:"multi_leg_info,omitempty"`
+	Code             string          `json:"code,omitempty"`
+	Side             string          `json:"side"`
+	OrderType        string          `json:"order_type"`
+	Qty              string          `json:"qty"`
+	Price            string          `json:"price,omitempty"`
+	TimeInForce      string          `json:"time_in_force"`
+	LotType          string          `json:"lot_type,omitempty"`
+	Remark           string          `json:"remark,omitempty"`
+	Session          string          `json:"session,omitempty"`
+	AuxPrice         string          `json:"aux_price,omitempty"`
+	OrderClass       string          `json:"order_class,omitempty"`
+	MultiLegInfo     json.RawMessage `json:"multi_leg_info,omitempty"`
+	PositionID       string          `json:"position_id,omitempty"`
+	ExpireTime       uint64          `json:"expire_time,omitempty"`
+	TrailType        string          `json:"trail_type,omitempty"`
+	TrailValue       string          `json:"trail_value,omitempty"`
+	TrailSpread      string          `json:"trail_spread,omitempty"`
+	PositionOpenType string          `json:"position_open_type,omitempty"`
+	AlgoInfo         json.RawMessage `json:"algo_info,omitempty"`
 }
 
 // ModifyOrderRequest is the payload for modifying an existing order.
 type ModifyOrderRequest struct {
-	Account  string `json:"-"`
-	Exchange string `json:"exchange"`
-	Qty      int64  `json:"-"`
-	Price    string `json:"-"`
-	AuxPrice string `json:"-"`
+	Account     string          `json:"-"`
+	Exchange    string          `json:"exchange"`
+	Qty         int64           `json:"-"`
+	Price       string          `json:"-"`
+	AuxPrice    string          `json:"-"`
+	TrailType   string          `json:"-"`
+	TrailValue  string          `json:"-"`
+	TrailSpread string          `json:"-"`
+	AlgoInfo    json.RawMessage `json:"-"`
 }
 
 type modifyOrderPayload struct {
-	Exchange string `json:"exchange"`
-	Qty      string `json:"qty"`
-	Price    string `json:"price,omitempty"`
-	AuxPrice string `json:"aux_price,omitempty"`
+	Exchange    string          `json:"exchange"`
+	Qty         string          `json:"qty"`
+	Price       string          `json:"price,omitempty"`
+	AuxPrice    string          `json:"aux_price,omitempty"`
+	TrailType   string          `json:"trail_type,omitempty"`
+	TrailValue  string          `json:"trail_value,omitempty"`
+	TrailSpread string          `json:"trail_spread,omitempty"`
+	AlgoInfo    json.RawMessage `json:"algo_info,omitempty"`
 }
 
 // CancelOrderRequest is the payload for cancelling an existing order.
@@ -246,11 +269,13 @@ type orderConfirmPayload struct {
 
 // TradingInfoRequest is the query for maximum tradable quantities.
 type TradingInfoRequest struct {
-	Account   string
-	Code      string
-	OrderType string
-	Price     string
-	OrderID   string
+	Account    string
+	Code       string
+	OrderType  string
+	Price      string
+	OrderID    string
+	PositionID string
+	Session    string
 }
 
 // OpenOrdersRequest holds parameters for querying open (incomplete) orders.
@@ -288,6 +313,19 @@ type OrderConfirmationRequiredError struct {
 	Exchange  string
 }
 
+// OrderJumpRequiredError means the broker requires the user to continue in a browser.
+type OrderJumpRequiredError struct {
+	URL     string
+	Message string
+}
+
+func (e *OrderJumpRequiredError) Error() string {
+	if e.Message == "" {
+		return "open this URL in a browser to continue: " + e.URL
+	}
+	return e.Message + "; open this URL in a browser to continue: " + e.URL
+}
+
 func (e *OrderConfirmationRequiredError) Error() string {
 	return "order confirmation required"
 }
@@ -301,35 +339,45 @@ const (
 
 // Position represents a held position in a security.
 type Position struct {
-	PositionSide   string  `json:"position_side"`
-	Code           string  `json:"code"`
-	StockName      string  `json:"stock_name"`
-	Qty            Decimal `json:"qty"`
-	CanSellQty     Decimal `json:"can_sell_qty"`
-	Currency       string  `json:"currency"`
-	NominalPrice   Decimal `json:"nominal_price"`
-	CostPrice      Decimal `json:"cost_price"`
-	CostPriceValid bool    `json:"cost_price_valid"`
-	MarketVal      Decimal `json:"market_val"`
-	PLRatio        Decimal `json:"pl_ratio"`
-	PLRatioValid   bool    `json:"pl_ratio_valid"`
-	PLVal          Decimal `json:"pl_val"`
-	PLValValid     bool    `json:"pl_val_valid"`
-	TodayPLVal     Decimal `json:"today_pl_val"`
-	TodayTrdVal    Decimal `json:"today_trd_val"`
-	TodayBuyQty    Decimal `json:"today_buy_qty"`
-	TodayBuyVal    Decimal `json:"today_buy_val"`
-	TodaySellQty   Decimal `json:"today_sell_qty"`
-	TodaySellVal   Decimal `json:"today_sell_val"`
-	UnrealizedPL   Decimal `json:"unrealized_pl"`
-	RealizedPL     Decimal `json:"realized_pl"`
+	PositionSide      string  `json:"position_side"`
+	Code              string  `json:"code"`
+	StockName         string  `json:"stock_name"`
+	PositionID        string  `json:"position_id,omitempty"`
+	Qty               Decimal `json:"qty"`
+	CanSellQty        Decimal `json:"can_sell_qty"`
+	Currency          string  `json:"currency"`
+	NominalPrice      Decimal `json:"nominal_price"`
+	CostPrice         Decimal `json:"cost_price"`
+	CostPriceValid    bool    `json:"cost_price_valid"`
+	MarketVal         Decimal `json:"market_val"`
+	PLRatio           Decimal `json:"pl_ratio"`
+	PLRatioValid      bool    `json:"pl_ratio_valid"`
+	PLVal             Decimal `json:"pl_val"`
+	PLValValid        bool    `json:"pl_val_valid"`
+	TodayPLVal        Decimal `json:"today_pl_val"`
+	TodayTrdVal       Decimal `json:"today_trd_val"`
+	TodayBuyQty       Decimal `json:"today_buy_qty"`
+	TodayBuyVal       Decimal `json:"today_buy_val"`
+	TodaySellQty      Decimal `json:"today_sell_qty"`
+	TodaySellVal      Decimal `json:"today_sell_val"`
+	UnrealizedPL      Decimal `json:"unrealized_pl"`
+	RealizedPL        Decimal `json:"realized_pl"`
+	SecurityType      string  `json:"security_type,omitempty"`
+	OpenTime          int64   `json:"open_time,omitempty"`
+	SubAccType        string  `json:"sub_acc_type,omitempty"`
+	MarginTradingType string  `json:"margin_trading_type,omitempty"`
+	MarginPeriodType  string  `json:"margin_period_type,omitempty"`
+	MarginRate        string  `json:"margin_rate,omitempty"`
+	CollateralQty     Decimal `json:"collateral_qty,omitempty"`
+	CoveredQty        Decimal `json:"covered_qty,omitempty"`
 }
 
 // PositionFilter holds optional query parameters for the positions API.
 type PositionFilter struct {
-	Code       string
-	PLRatioMin string
-	PLRatioMax string
+	Code          string
+	PLRatioMin    string
+	PLRatioMax    string
+	AssetCategory string
 }
 
 // Deal represents a single executed trade.
@@ -684,13 +732,17 @@ type orderResponse struct {
 }
 
 type placeOrderResponse struct {
-	Status       string `json:"s"`
-	ErrorCode    int    `json:"errcode"`
-	ErrorMessage string `json:"errmsg"`
-	Data         struct {
+	Status           string `json:"s"`
+	ErrorCode        int    `json:"errcode"`
+	ErrorMessage     string `json:"errmsg"`
+	NeedOrderConfirm bool   `json:"need_order_confirm"`
+	ConfirmID        string `json:"confirm_id"`
+	JumpURL          string `json:"jump_url"`
+	Data             struct {
 		OrderID          string `json:"order_id"`
 		NeedOrderConfirm bool   `json:"need_order_confirm"`
 		ConfirmID        string `json:"confirm_id"`
+		JumpURL          string `json:"jump_url"`
 	} `json:"d"`
 }
 
@@ -865,10 +917,7 @@ func (s *TradeService) PlaceOrder(ctx context.Context, req PlaceOrderRequest) (*
 	if err := s.client.Call(ctx, endpointOrderPlace, opts, &resp); err != nil {
 		return nil, fmt.Errorf("place order: %w", err)
 	}
-	if err := checkAccountAPIStatus(resp.Status, resp.ErrorCode, resp.ErrorMessage); err != nil {
-		return nil, err
-	}
-	if err := requireOrderConfirmation(req.Account, resp, ""); err != nil {
+	if err := finishOrderAction(req.Account, "", resp); err != nil {
 		return nil, err
 	}
 	return newPlacedOrder(req, resp.Data.OrderID), nil
@@ -888,10 +937,7 @@ func (s *TradeService) ModifyOrder(ctx context.Context, orderID string, req Modi
 	if err := s.client.Call(ctx, endpointOrderModify, opts, &resp); err != nil {
 		return nil, fmt.Errorf("modify order: %w", err)
 	}
-	if err := checkAccountAPIStatus(resp.Status, resp.ErrorCode, resp.ErrorMessage); err != nil {
-		return nil, err
-	}
-	if err := requireOrderConfirmation(req.Account, resp, req.Exchange); err != nil {
+	if err := finishOrderAction(req.Account, req.Exchange, resp); err != nil {
 		return nil, err
 	}
 	return newModifiedOrder(orderID, req, resp.Data.OrderID), nil
@@ -911,22 +957,30 @@ func (s *TradeService) CancelOrder(ctx context.Context, orderID string, req Canc
 	if err := s.client.Call(ctx, endpointOrderCancel, opts, &resp); err != nil {
 		return fmt.Errorf("cancel order: %w", err)
 	}
-	if err := checkAccountAPIStatus(resp.Status, resp.ErrorCode, resp.ErrorMessage); err != nil {
+	return finishOrderAction(req.Account, req.Exchange, resp)
+}
+
+func finishOrderAction(account, exchange string, resp placeOrderResponse) error {
+	if err := requireOrderConfirmation(account, resp, exchange); err != nil {
 		return err
 	}
-	return requireOrderConfirmation(req.Account, resp, req.Exchange)
+	if jumpURL := strings.TrimSpace(firstString(resp.JumpURL, resp.Data.JumpURL)); jumpURL != "" {
+		return &OrderJumpRequiredError{URL: jumpURL, Message: resp.ErrorMessage}
+	}
+	return checkAccountAPIStatus(resp.Status, resp.ErrorCode, resp.ErrorMessage)
 }
 
 func requireOrderConfirmation(account string, resp placeOrderResponse, exchange string) error {
-	if !resp.Data.NeedOrderConfirm {
+	if !resp.NeedOrderConfirm && !resp.Data.NeedOrderConfirm {
 		return nil
 	}
-	if len(resp.Data.ConfirmID) == 0 {
+	confirmID := firstString(resp.ConfirmID, resp.Data.ConfirmID)
+	if len(confirmID) == 0 {
 		return fmt.Errorf("order confirmation required but confirm_id is empty")
 	}
 	return &OrderConfirmationRequiredError{
 		Account:   account,
-		ConfirmID: resp.Data.ConfirmID,
+		ConfirmID: confirmID,
 		Exchange:  exchange,
 	}
 }
@@ -941,7 +995,7 @@ func (s *TradeService) ConfirmOrder(ctx context.Context, req OrderConfirmRequest
 	if err := s.client.Call(ctx, endpointOrderConfirm, opts, &resp); err != nil {
 		return "", fmt.Errorf("confirm order: %w", err)
 	}
-	if err := checkAccountAPIStatus(resp.Status, resp.ErrorCode, resp.ErrorMessage); err != nil {
+	if err := finishOrderAction(req.Account, req.Exchange, resp); err != nil {
 		return "", err
 	}
 	return resp.Data.OrderID, nil
@@ -1028,6 +1082,9 @@ func (s *TradeService) GetPositions(ctx context.Context, account string, filter 
 	}
 	if len(filter.PLRatioMax) > 0 {
 		params.Set("pl_ratio_max", filter.PLRatioMax)
+	}
+	if len(filter.AssetCategory) > 0 {
+		params.Set("asset_category", filter.AssetCategory)
 	}
 
 	opts := client.CallOpts{
@@ -1116,8 +1173,11 @@ func (s *TradeService) ListAccounts(ctx context.Context) ([]Account, error) {
 }
 
 // GetFunds returns the monetary summary for the given account.
-func (s *TradeService) GetFunds(ctx context.Context, account, currency string) (*Funds, error) {
+func (s *TradeService) GetFunds(ctx context.Context, account, currency, assetCategory string) (*Funds, error) {
 	params := url.Values{"currency": {currency}}
+	if len(strings.TrimSpace(assetCategory)) > 0 {
+		params.Set("asset_category", strings.TrimSpace(assetCategory))
+	}
 	opts := client.CallOpts{PathParams: map[string]string{"acc_id": account}, Params: params}
 	var resp fundsResponse
 	if err := s.client.Call(ctx, endpointAccountFund, opts, &resp); err != nil {
@@ -1127,6 +1187,70 @@ func (s *TradeService) GetFunds(ctx context.Context, account, currency string) (
 		return nil, err
 	}
 	return &resp.Data, nil
+}
+
+// ComboTradingInfoRequest is the body for a combo options buying-power preview.
+type ComboTradingInfoRequest struct {
+	Account      string
+	MultiLegInfo json.RawMessage
+	Price        string
+	Qty          int64
+	Side         string
+	OrderID      string
+}
+
+type comboTradingInfoPayload struct {
+	MultiLegInfo json.RawMessage `json:"multi_leg_info"`
+	Price        string          `json:"price"`
+	Qty          string          `json:"qty"`
+	Side         string          `json:"side"`
+	OrderID      string          `json:"order_id,omitempty"`
+}
+
+// MarginPreview is one margin change line in a combo trading preview.
+type MarginPreview struct {
+	Name     string  `json:"name"`
+	IncValue Decimal `json:"inc_value"`
+}
+
+// ComboTradingInfo is the buying-power and margin preview for a combo order.
+type ComboTradingInfo struct {
+	OptionBuyingPower   Decimal         `json:"option_buying_power"`
+	BuyingPowerDecrease Decimal         `json:"buying_power_decrease"`
+	MarginPreviews      []MarginPreview `json:"margin_previews,omitempty"`
+}
+
+type comboTradingInfoResponse struct {
+	Status       string           `json:"s"`
+	ErrorCode    int              `json:"errcode"`
+	ErrorMessage string           `json:"errmsg"`
+	Data         ComboTradingInfo `json:"d"`
+}
+
+// GetComboTradingInfo previews buying power and margin for a combo options order.
+func (s *TradeService) GetComboTradingInfo(ctx context.Context, req ComboTradingInfoRequest) (*ComboTradingInfo, error) {
+	opts := client.CallOpts{
+		Body:       newComboTradingInfoPayload(req),
+		PathParams: map[string]string{"acc_id": req.Account},
+	}
+	var resp comboTradingInfoResponse
+	if err := s.client.Call(ctx, endpointComboInfo, opts, &resp); err != nil {
+		return nil, fmt.Errorf("get combo trading info: %w", err)
+	}
+	if err := checkAccountAPIStatus(resp.Status, resp.ErrorCode, resp.ErrorMessage); err != nil {
+		return nil, err
+	}
+	return &resp.Data, nil
+}
+
+func newComboTradingInfoPayload(req ComboTradingInfoRequest) comboTradingInfoPayload {
+	return comboTradingInfoPayload{
+		MultiLegInfo: req.MultiLegInfo,
+		Price:        req.Price,
+		Qty:          strconv.FormatInt(req.Qty, qtyFormatBase),
+		Side:         req.Side,
+		OrderID:      strings.TrimSpace(req.OrderID),
+	}
 }
 
 // GetTradingInfo returns maximum tradable quantities for a security.
@@ -1241,7 +1365,7 @@ type CashLog struct {
 
 // CashLogsRequest filters paginated cash logs (times in microseconds).
 type CashLogsRequest struct {
-	Account  string
+	Account   string
 	BeginTime int64
 	EndTime   int64
 	Direction string // IN, OUT, or empty
@@ -1325,14 +1449,21 @@ func newPlaceOrderPayload(req PlaceOrderRequest) placeOrderPayload {
 		TimeInForce: req.TimeInForce, LotType: req.LotType, Remark: req.Remark,
 		Session: req.Session, AuxPrice: req.AuxPrice, OrderClass: req.OrderClass,
 		MultiLegInfo: req.MultiLegInfo,
+		PositionID:   req.PositionID, ExpireTime: req.ExpireTime,
+		TrailType: req.TrailType, TrailValue: req.TrailValue, TrailSpread: req.TrailSpread,
+		PositionOpenType: req.PositionOpenType, AlgoInfo: req.AlgoInfo,
 	}
 	return payload
 }
 
 func newModifyOrderPayload(req ModifyOrderRequest) modifyOrderPayload {
 	payload := modifyOrderPayload{
-		Exchange: req.Exchange,
-		Qty:      strconv.FormatInt(req.Qty, qtyFormatBase),
+		Exchange:    req.Exchange,
+		Qty:         strconv.FormatInt(req.Qty, qtyFormatBase),
+		TrailType:   req.TrailType,
+		TrailValue:  req.TrailValue,
+		TrailSpread: req.TrailSpread,
+		AlgoInfo:    req.AlgoInfo,
 	}
 	payload.Price = req.Price
 	payload.AuxPrice = req.AuxPrice
@@ -1420,6 +1551,12 @@ func newTradingInfoParams(req TradingInfoRequest) url.Values {
 	}
 	if len(req.OrderID) > 0 {
 		params.Set("order_id", req.OrderID)
+	}
+	if len(strings.TrimSpace(req.PositionID)) > 0 {
+		params.Set("position_id", strings.TrimSpace(req.PositionID))
+	}
+	if len(strings.TrimSpace(req.Session)) > 0 {
+		params.Set("session", strings.TrimSpace(req.Session))
 	}
 	return params
 }

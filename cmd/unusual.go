@@ -25,7 +25,7 @@ var unusualCmd = &cobra.Command{
 var unusualTechnicalCmd = &cobra.Command{
 	Use:     "technical-signals",
 	Aliases: []string{"technical"},
-	Short:   "Technical unusual summary (GET /quote/{symbol}/unusual/technical)",
+	Short:   "Technical unusual summary (POST /quote/{symbol}/unusual/technical)",
 	Args:    cobra.ExactArgs(1),
 	RunE:    runUnusualTechnical,
 }
@@ -33,7 +33,7 @@ var unusualTechnicalCmd = &cobra.Command{
 var unusualCapitalCmd = &cobra.Command{
 	Use:     "capital-flows",
 	Aliases: []string{"capital"},
-	Short:   "Capital unusual summary (GET /quote/{symbol}/unusual/capital)",
+	Short:   "Capital unusual summary (POST /quote/{symbol}/unusual/capital)",
 	Args:    cobra.ExactArgs(1),
 	RunE:    runUnusualCapital,
 }
@@ -41,7 +41,7 @@ var unusualCapitalCmd = &cobra.Command{
 var unusualDerivativesCmd = &cobra.Command{
 	Use:     "derivatives-activity",
 	Aliases: []string{"derivatives"},
-	Short:   "Derivatives unusual summary (GET /quote/{symbol}/unusual/derivatives)",
+	Short:   "Derivatives unusual summary (POST /quote/{symbol}/unusual/derivatives)",
 	Args:    cobra.ExactArgs(1),
 	RunE:    runUnusualDerivatives,
 }

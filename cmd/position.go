@@ -12,6 +12,7 @@ import (
 
 // Table header labels for the position command.
 const (
+	posHeaderPositionID  = "Position ID"
 	posHeaderCode        = "Code"
 	posHeaderName        = "Name"
 	posHeaderSide        = "Side"
@@ -44,6 +45,7 @@ func init() {
 	positionCmd.Flags().String("symbol", "", "Symbol filter in MARKET.CODE format, for example US.AAPL")
 	positionCmd.Flags().String("pl-ratio-min", "", "Minimum P/L ratio, for example -0.1 means >= -10%")
 	positionCmd.Flags().String("pl-ratio-max", "", "Maximum P/L ratio, for example 0.2 means <= +20%")
+	positionCmd.Flags().String("asset-category", "", "JP asset category: DOMESTIC or FOREIGN (required for JP derivative accounts; JP margin defaults to FOREIGN)")
 	rootCmd.AddCommand(positionCmd)
 }
 
@@ -69,6 +71,10 @@ func runPosition(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("reading pl-ratio-max flag: %w", err)
 	}
+	assetCategory, err := cmd.Flags().GetString("asset-category")
+	if err != nil {
+		return fmt.Errorf("reading asset-category flag: %w", err)
+	}
 
 	account = resolveAccount(account)
 	if len(account) == 0 {
@@ -76,10 +82,15 @@ func runPosition(cmd *cobra.Command, _ []string) error {
 	}
 
 	ctx := cmdContext(cmd)
+	assetCategory, err = resolveAssetCategory(ctx, account, assetCategory)
+	if err != nil {
+		return err
+	}
 	filter := service.PositionFilter{
-		Code:       symbol,
-		PLRatioMin: plRatioMin,
-		PLRatioMax: plRatioMax,
+		Code:          symbol,
+		PLRatioMin:    plRatioMin,
+		PLRatioMax:    plRatioMax,
+		AssetCategory: assetCategory,
 	}
 	positions, err := tradeSvc.GetPositions(ctx, account, filter)
 	if err != nil {
@@ -95,6 +106,7 @@ func runPosition(cmd *cobra.Command, _ []string) error {
 // renderPositionTable writes position data as a formatted table to stdout.
 func renderPositionTable(positions []service.Position) {
 	tw := output.NewTableWriter(os.Stdout,
+		posHeaderPositionID,
 		posHeaderCode,
 		posHeaderName,
 		posHeaderSide,
@@ -111,6 +123,7 @@ func renderPositionTable(positions []service.Position) {
 
 	for _, p := range positions {
 		tw.AddRow(
+			p.PositionID,
 			p.Code,
 			p.StockName,
 			formatPositionSide(p.PositionSide),

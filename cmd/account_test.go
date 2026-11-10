@@ -1,8 +1,13 @@
 package cmd
 
 import (
+	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"github.com/futunn/futu/internal/client"
 	"github.com/futunn/futu/internal/service"
 )
 
@@ -54,5 +59,51 @@ func TestHasTradingMarket(t *testing.T) {
 	}
 	if hasTradingMarket([]int{marketHongKong}, marketCrypto) {
 		t.Fatal("expected crypto market to be absent")
+	}
+}
+
+func TestResolveAssetCategory(t *testing.T) {
+	restore := stubAccounts(t, `{"s":"ok","d":{"accounts":[`+
+		`{"account_id":"margin","security_firm":"FUTUJP","acc_type":"margin"},`+
+		`{"account_id":"deriv","security_firm":"FUTUJP","acc_type":"derivative"},`+
+		`{"account_id":"cash","security_firm":"FUTUJP","acc_type":"cash"},`+
+		`{"account_id":"us","security_firm":"FUTUINC","acc_type":"margin"}]}}`)
+	defer restore()
+
+	got, err := resolveAssetCategory(context.Background(), "margin", "")
+	if err != nil || got != assetCategoryForeign {
+		t.Fatalf("JP margin category = %q, %v", got, err)
+	}
+	if _, err = resolveAssetCategory(context.Background(), "deriv", ""); err == nil {
+		t.Fatal("expected JP derivative account to require --asset-category")
+	}
+	got, err = resolveAssetCategory(context.Background(), "deriv", "domestic")
+	if err != nil || got != assetCategoryDomestic {
+		t.Fatalf("explicit category = %q, %v", got, err)
+	}
+	got, err = resolveAssetCategory(context.Background(), "cash", "")
+	if err != nil || got != "" {
+		t.Fatalf("JP cash category = %q, %v", got, err)
+	}
+	got, err = resolveAssetCategory(context.Background(), "us", "")
+	if err != nil || got != "" {
+		t.Fatalf("non-JP category = %q, %v", got, err)
+	}
+	if _, err = resolveAssetCategory(context.Background(), "us", "BOTH"); err == nil {
+		t.Fatal("expected unsupported asset category to fail")
+	}
+}
+
+func stubAccounts(t *testing.T, body string) func() {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(writer, body)
+	}))
+	previous := tradeSvc
+	tradeSvc = service.NewTradeService(client.New(server.URL))
+	return func() {
+		server.Close()
+		tradeSvc = previous
 	}
 }
