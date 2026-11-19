@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func TestMatchUnusualRoutesUsePOST(t *testing.T) {
+func TestMatchUnusualRoutesUseGET(t *testing.T) {
 	cases := []struct {
 		path string
 		id   string
@@ -20,12 +20,12 @@ func TestMatchUnusualRoutesUsePOST(t *testing.T) {
 		{"/api/v1.0/quote/US.AAPL/unusual/derivatives", "skillwrap_derivative_unusual"},
 	}
 	for _, tc := range cases {
-		got := MatchToolRoute(http.MethodPost, tc.path)
+		got := MatchToolRoute(http.MethodGet, tc.path)
 		if got.ID != tc.id {
-			t.Fatalf("POST %s id = %q, want %q", tc.path, got.ID, tc.id)
+			t.Fatalf("GET %s id = %q, want %q", tc.path, got.ID, tc.id)
 		}
-		if get := MatchToolRoute(http.MethodGet, tc.path); get.ID != "" {
-			t.Fatalf("GET %s matched %q", tc.path, get.ID)
+		if post := MatchToolRoute(http.MethodPost, tc.path); post.ID != "" {
+			t.Fatalf("POST %s matched %q", tc.path, post.ID)
 		}
 	}
 }

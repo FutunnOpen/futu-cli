@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -11,26 +10,23 @@ import (
 	"github.com/futunn/futu/internal/client"
 )
 
-func TestGetTechnicalUnusualUsesBody(t *testing.T) {
+func TestGetTechnicalUnusualUsesQuery(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
+		if r.Method != http.MethodGet {
 			t.Fatalf("method = %s", r.Method)
 		}
 		if r.URL.Path != "/api/v1.0/quote/HK.00700/unusual/technical" {
 			t.Fatalf("path = %s", r.URL.Path)
 		}
-		if r.URL.RawQuery != "" {
+		query := r.URL.Query()
+		if query.Get("time_range") != "7" || query.Get("language_id") != "0" {
 			t.Fatalf("query = %s", r.URL.RawQuery)
 		}
-		var body unusualPayload
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("decode body: %v", err)
+		if filters := query["indicator_filters"]; len(filters) != 1 || filters[0] != "MACD" {
+			t.Fatalf("indicator_filters = %#v", filters)
 		}
-		if body.TimeRange != 7 || body.LanguageID != 0 {
-			t.Fatalf("body = %#v", body)
-		}
-		if len(body.IndicatorFilters) != 1 || body.IndicatorFilters[0] != "MACD" {
-			t.Fatalf("indicator_filters = %#v", body.IndicatorFilters)
+		if len(query["analysis_dimensions"]) != 0 {
+			t.Fatalf("analysis_dimensions = %#v", query["analysis_dimensions"])
 		}
 		fmt.Fprint(w, `{"ret_code":0,"ret_msg":"success","data":{"code":0,"message":"","time_range":"2026.1.1-2026.1.8","content":"ok"}}`)
 	}))
@@ -51,11 +47,18 @@ func TestGetTechnicalUnusualUsesBody(t *testing.T) {
 
 func TestGetFinancialUnusualNoAnomaly(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
+		if r.Method != http.MethodGet {
 			t.Fatalf("method = %s", r.Method)
 		}
 		if r.URL.Path != "/api/v1.0/quote/US.AAPL/unusual/capital" {
 			t.Fatalf("path = %s", r.URL.Path)
+		}
+		query := r.URL.Query()
+		if query.Get("time_range") != "7" || query.Get("language_id") != "0" {
+			t.Fatalf("query = %s", r.URL.RawQuery)
+		}
+		if len(query["analysis_dimensions"]) != 0 {
+			t.Fatalf("analysis_dimensions = %#v", query["analysis_dimensions"])
 		}
 		fmt.Fprint(w, `{"ret_code":0,"ret_msg":"success","data":{"code":1,"message":"","time_range":"","content":""}}`)
 	}))
@@ -71,20 +74,18 @@ func TestGetFinancialUnusualNoAnomaly(t *testing.T) {
 	}
 }
 
-func TestGetDerivativeUnusualBody(t *testing.T) {
+func TestGetDerivativeUnusualQuery(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
+		if r.Method != http.MethodGet {
 			t.Fatalf("method = %s", r.Method)
 		}
-		var body unusualPayload
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("decode body: %v", err)
+		query := r.URL.Query()
+		dimensions := query["analysis_dimensions"]
+		if len(dimensions) != 2 || dimensions[0] != "option_unusual" || dimensions[1] != "option_volatility" {
+			t.Fatalf("analysis_dimensions = %#v", dimensions)
 		}
-		if len(body.AnalysisDimensions) != 2 || body.AnalysisDimensions[0] != "option_unusual" || body.AnalysisDimensions[1] != "option_volatility" {
-			t.Fatalf("analysis_dimensions = %#v", body.AnalysisDimensions)
-		}
-		if body.TimeRange != 30 {
-			t.Fatalf("time_range = %d", body.TimeRange)
+		if query.Get("time_range") != "30" {
+			t.Fatalf("time_range = %s", query.Get("time_range"))
 		}
 		fmt.Fprint(w, `{"ret_code":0,"ret_msg":"success","data":{"code":0,"message":"","time_range":"近30个自然日","content":"options"}}`)
 	}))
@@ -120,7 +121,7 @@ func TestGetUnusualRejectsEmptySymbolAndLongWindow(t *testing.T) {
 
 func TestGetDerivativeUnusualGatewayError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
+		if r.Method != http.MethodGet {
 			t.Fatalf("method = %s", r.Method)
 		}
 		if r.URL.Path != "/api/v1.0/quote/HK.00700/unusual/derivatives" {
