@@ -3,6 +3,7 @@ module github.com/futunn/futu
 go 1.27.3
 
 require (
+	github.com/coder/websocket v1.8.13
 	github.com/spf13/cobra v1.8.1
 	github.com/zalando/go-keyring v0.2.6
 	golang.org/x/sys v0.26.0

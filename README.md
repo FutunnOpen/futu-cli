@@ -165,6 +165,7 @@ Most commands support `--format json` for JSON output and `--format table` (defa
 | Command | Description |
 |---------|-------------|
 | `futu quote <symbol...>` | Query real-time quotes for one or more securities |
+| `futu quote subscribe` | Subscribe to realtime pushes for a bounded time. Defaults: `--duration 20s`, `--max-messages 50` |
 | `futu basicinfo <symbol...>` | Query static security information |
 | `futu snapshot <symbol...>` | Query market snapshots in batch |
 | `futu kline <symbol>` | Query recent K-line/candlestick data |
