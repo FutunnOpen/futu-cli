@@ -187,3 +187,26 @@ func TestConfirmActionAcceptsExplicitYes(t *testing.T) {
 		t.Fatal("confirmAction() rejected explicit yes")
 	}
 }
+
+func TestFractionalOrderQuantityParsing(t *testing.T) {
+	previous := orderFlags
+	defer func() { orderFlags = previous }()
+	orderFlags.account = "123"
+	orderFlags.typ = "market"
+	req, err := buildPlaceOrderRequest("US.AAPL", "0.123456789123456789", "BUY")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if req.QtyText != "0.123456789123456789" {
+		t.Fatalf("qty = %q", req.QtyText)
+	}
+	orderFlags.qty = "0.123456789123456789"
+	orderFlags.exchange = "US"
+	mod, err := buildModifyOrderRequest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mod.QtyText != req.QtyText {
+		t.Fatalf("modify qty = %q", mod.QtyText)
+	}
+}

@@ -1236,15 +1236,30 @@ var quoteRESTSpecs = []quoteRESTSpec{
 		Params: []quoteRESTParam{
 			{
 				Name:     "keyword",
-				CLIName:  "keyword",
 				Kind:     "string",
 				Required: true,
 				Source:   "query",
+				CLIName:  "keyword",
+			},
+			{
+				Name: "news_type", Kind: "string", Default: "ALL", Source: "query", Enum: "ALL/POST/NOTICE/REPORT",
+			},
+			{
+				Name: "sort_type", Kind: "string", Default: "TIME", Source: "query", Enum: "TIME/PV",
+			},
+			{
+				Name: "lang", Kind: "string", Source: "query", Enum: "zh-CN/zh-HK/en/ja",
+			},
+			{
+				Name: "source_ids", Kind: "string", Source: "query",
+			},
+			{
+				Name: "sources", Kind: "string", Source: "query",
 			},
 			{
 				Name:    "page_size",
 				Kind:    "int",
-				Default: "20",
+				Default: "10",
 				Source:  "query",
 			},
 		},

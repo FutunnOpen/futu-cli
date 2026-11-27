@@ -37,7 +37,7 @@ const (
 
 	DefaultTradingMarket = "HK"
 	DefaultPageSize      = 50
-	minPageSize          = 10
+	minPageSize          = 1
 	maxPageSize          = 100
 )
 
@@ -55,16 +55,17 @@ func NewTradeService(c *client.Client) *TradeService {
 
 // Order represents a trading order.
 type Order struct {
-	OrderID    string         `json:"order_id"`
-	Symbol     string         `json:"symbol"`
-	Side       string         `json:"side"` // "BUY"/"SELL"
-	Type       string         `json:"type"` // "LIMIT"/"MARKET"
-	Price      float64        `json:"price"`
-	Qty        int64          `json:"qty"`
-	FilledQty  int64          `json:"filled_qty"`
-	Status     string         `json:"status"`
-	CreateTime int64          `json:"create_time"`
-	Extra      map[string]any `json:"-"`
+	OrderID                           string         `json:"order_id"`
+	Symbol                            string         `json:"symbol"`
+	Side                              string         `json:"side"` // "BUY"/"SELL"
+	Type                              string         `json:"type"` // "LIMIT"/"MARKET"
+	Price                             float64        `json:"price"`
+	Qty                               int64          `json:"qty"`
+	FilledQty                         int64          `json:"filled_qty"`
+	Status                            string         `json:"status"`
+	CreateTime                        int64          `json:"create_time"`
+	Extra                             map[string]any `json:"-"`
+	priceText, qtyText, filledQtyText string
 }
 
 type orderWire struct {
@@ -105,6 +106,10 @@ func (o *Order) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("decode filled quantity: %w", err)
 	}
 
+	priceText, _ := decodeStringOrNumber(wire.Price)
+	qtyText, _ := decodeStringOrNumber(wire.Qty)
+	filledText, _ := decodeStringOrNumber(firstRaw(wire.FilledQty, wire.DealtQty))
+
 	*o = Order{
 		OrderID:    wire.OrderID,
 		Symbol:     firstString(wire.Symbol, wire.Code),
@@ -116,6 +121,7 @@ func (o *Order) UnmarshalJSON(data []byte) error {
 		Status:     firstString(wire.Status, wire.OrderStatus),
 		CreateTime: wire.CreateTime,
 		Extra:      extraOrderFields(data),
+		priceText:  priceText, qtyText: qtyText, filledQtyText: filledText,
 	}
 	return nil
 }
@@ -132,6 +138,15 @@ func (o Order) MarshalJSON() ([]byte, error) {
 	values["price"] = o.Price
 	values["qty"] = o.Qty
 	values["filled_qty"] = o.FilledQty
+	if len(o.priceText) > 0 {
+		values["price"] = o.priceText
+	}
+	if len(o.qtyText) > 0 {
+		values["qty"] = o.qtyText
+	}
+	if len(o.filledQtyText) > 0 {
+		values["filled_qty"] = o.filledQtyText
+	}
 	values["status"] = o.Status
 	values["create_time"] = o.CreateTime
 	return json.Marshal(values)
@@ -175,6 +190,7 @@ var canonicalDealFields = map[string]bool{
 	"time":                true,
 	"create_time":         true,
 	"updated_time":        true,
+	"update_time":         true,
 	"status":              true,
 	"counter_broker_id":   true,
 	"counter_broker_name": true,
@@ -195,6 +211,7 @@ type PlaceOrderRequest struct {
 	AuxPrice         string          `json:"-"`
 	OrderClass       string          `json:"order_class,omitempty"`
 	MultiLegInfo     json.RawMessage `json:"multi_leg_info,omitempty"`
+	SubAccountID     string          `json:"-"`
 	PositionID       string          `json:"-"`
 	ExpireTime       uint64          `json:"-"`
 	TrailType        string          `json:"-"`
@@ -202,6 +219,7 @@ type PlaceOrderRequest struct {
 	TrailSpread      string          `json:"-"`
 	PositionOpenType string          `json:"-"`
 	AlgoInfo         json.RawMessage `json:"-"`
+	QtyText          string          `json:"-"`
 }
 
 type placeOrderPayload struct {
@@ -217,6 +235,7 @@ type placeOrderPayload struct {
 	AuxPrice         string          `json:"aux_price,omitempty"`
 	OrderClass       string          `json:"order_class,omitempty"`
 	MultiLegInfo     json.RawMessage `json:"multi_leg_info,omitempty"`
+	SubAccountID     string          `json:"sub_acc_id,omitempty"`
 	PositionID       string          `json:"position_id,omitempty"`
 	ExpireTime       uint64          `json:"expire_time,omitempty"`
 	TrailType        string          `json:"trail_type,omitempty"`
@@ -237,6 +256,7 @@ type ModifyOrderRequest struct {
 	TrailValue  string          `json:"-"`
 	TrailSpread string          `json:"-"`
 	AlgoInfo    json.RawMessage `json:"-"`
+	QtyText     string          `json:"-"`
 }
 
 type modifyOrderPayload struct {
@@ -269,13 +289,14 @@ type orderConfirmPayload struct {
 
 // TradingInfoRequest is the query for maximum tradable quantities.
 type TradingInfoRequest struct {
-	Account    string
-	Code       string
-	OrderType  string
-	Price      string
-	OrderID    string
-	PositionID string
-	Session    string
+	Account      string
+	Code         string
+	OrderType    string
+	Price        string
+	OrderID      string
+	SubAccountID string
+	PositionID   string
+	Session      string
 }
 
 // OpenOrdersRequest holds parameters for querying open (incomplete) orders.
@@ -283,6 +304,7 @@ type OpenOrdersRequest struct {
 	Account  string
 	Market   string
 	PageSize int
+	PageFlag string
 }
 
 // HistoryOrdersRequest holds parameters for querying historical orders.
@@ -293,6 +315,7 @@ type HistoryOrdersRequest struct {
 	End      int64
 	Symbol   string
 	PageSize int
+	PageFlag string
 }
 
 // OrderDetailsRequest holds parameters for querying order details.
@@ -382,19 +405,20 @@ type PositionFilter struct {
 
 // Deal represents a single executed trade.
 type Deal struct {
-	DealID            string         `json:"deal_id"`
-	OrderID           string         `json:"order_id"`
-	Symbol            string         `json:"symbol"`
-	StockName         string         `json:"stock_name"`
-	Side              string         `json:"side"`
-	Price             float64        `json:"price"`
-	Qty               int64          `json:"qty"`
-	Time              int64          `json:"time"`
-	UpdatedTime       int64          `json:"updated_time"`
-	Status            string         `json:"status"`
-	CounterBrokerID   int64          `json:"counter_broker_id"`
-	CounterBrokerName string         `json:"counter_broker_name"`
-	Extra             map[string]any `json:"-"`
+	DealID             string         `json:"deal_id"`
+	OrderID            string         `json:"order_id"`
+	Symbol             string         `json:"symbol"`
+	StockName          string         `json:"stock_name"`
+	Side               string         `json:"side"`
+	Price              float64        `json:"price"`
+	Qty                int64          `json:"qty"`
+	Time               int64          `json:"time"`
+	UpdatedTime        int64          `json:"updated_time"`
+	Status             string         `json:"status"`
+	CounterBrokerID    string         `json:"counter_broker_id"`
+	CounterBrokerName  string         `json:"counter_broker_name"`
+	Extra              map[string]any `json:"-"`
+	priceText, qtyText string
 }
 
 // TodayDealsRequest holds parameters for querying today's fills.
@@ -402,6 +426,7 @@ type TodayDealsRequest struct {
 	Account  string
 	Market   string
 	PageSize int
+	PageFlag string
 }
 
 // HistoryDealsRequest holds parameters for querying historical fills.
@@ -412,6 +437,7 @@ type HistoryDealsRequest struct {
 	End      int64
 	Symbol   string
 	PageSize int
+	PageFlag string
 }
 
 type dealWire struct {
@@ -427,6 +453,7 @@ type dealWire struct {
 	Time              int64           `json:"time"`
 	CreateTime        int64           `json:"create_time"`
 	UpdatedTime       int64           `json:"updated_time"`
+	UpdateTime        int64           `json:"update_time"`
 	Status            string          `json:"status"`
 	CounterBrokerID   json.RawMessage `json:"counter_broker_id"`
 	CounterBrokerName string          `json:"counter_broker_name"`
@@ -445,10 +472,13 @@ func (d *Deal) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return fmt.Errorf("decode deal qty: %w", err)
 	}
-	brokerID, err := decodeInt64(wire.CounterBrokerID)
+	brokerID, err := decodeStringOrNumber(wire.CounterBrokerID)
 	if err != nil {
 		return fmt.Errorf("decode counter broker id: %w", err)
 	}
+	priceText, _ := decodeStringOrNumber(wire.Price)
+	qtyText, _ := decodeStringOrNumber(wire.Qty)
+
 	*d = Deal{
 		DealID:            wire.DealID,
 		OrderID:           wire.OrderID,
@@ -458,11 +488,12 @@ func (d *Deal) UnmarshalJSON(data []byte) error {
 		Price:             price,
 		Qty:               qty,
 		Time:              firstInt64(wire.Time, wire.CreateTime),
-		UpdatedTime:       wire.UpdatedTime,
+		UpdatedTime:       firstInt64(wire.UpdateTime, wire.UpdatedTime),
 		Status:            wire.Status,
 		CounterBrokerID:   brokerID,
 		CounterBrokerName: wire.CounterBrokerName,
 		Extra:             extraDealFields(data),
+		priceText:         priceText, qtyText: qtyText,
 	}
 	return nil
 }
@@ -479,6 +510,12 @@ func (d Deal) MarshalJSON() ([]byte, error) {
 	values["side"] = d.Side
 	values["price"] = d.Price
 	values["qty"] = d.Qty
+	if len(d.priceText) > 0 {
+		values["price"] = d.priceText
+	}
+	if len(d.qtyText) > 0 {
+		values["qty"] = d.qtyText
+	}
 	values["time"] = d.Time
 	values["updated_time"] = d.UpdatedTime
 	values["status"] = d.Status
@@ -487,19 +524,64 @@ func (d Deal) MarshalJSON() ([]byte, error) {
 	return json.Marshal(values)
 }
 
+// SetDisplayValues retains the exact submitted values after broker confirmation.
+func (o *Order) SetDisplayValues(price, qty string) {
+	o.priceText = price
+	o.qtyText = qty
+}
+
+// PriceText and QuantityText preserve the API's decimal strings for display.
+func (o Order) PriceText() string {
+	if len(o.priceText) > 0 {
+		return o.priceText
+	}
+	return strconv.FormatFloat(o.Price, 'f', 3, 64)
+}
+func (o Order) QuantityText() string {
+	if len(o.qtyText) > 0 {
+		return o.qtyText
+	}
+	return strconv.FormatInt(o.Qty, 10)
+}
+func (o Order) FilledQuantityText() string {
+	if len(o.filledQtyText) > 0 {
+		return o.filledQtyText
+	}
+	return strconv.FormatInt(o.FilledQty, 10)
+}
+func (d Deal) PriceText() string {
+	if len(d.priceText) > 0 {
+		return d.priceText
+	}
+	return strconv.FormatFloat(d.Price, 'f', 3, 64)
+}
+func (d Deal) QuantityText() string {
+	if len(d.qtyText) > 0 {
+		return d.qtyText
+	}
+	return strconv.FormatInt(d.Qty, 10)
+}
+
 // Account represents a trading account.
 type Account struct {
-	FutuID                string `json:"futu_id"`
-	AccountID             string `json:"account_id"`
-	AccountNo             string `json:"account_card_number"`
-	UniversalAccountNo    string `json:"univs_account_card_number"`
-	MemberID              string `json:"member_id"`
-	Type                  string `json:"acc_type"`
-	Channel               string `json:"channel"`
-	AccountChannel        string `json:"account_channel"`
-	SecurityFirm          string `json:"security_firm"`
-	Name                  string `json:"name"`
-	EnabledTradingMarkets []int  `json:"enable_market"`
+	FutuID                string       `json:"futu_id"`
+	AccountID             string       `json:"account_id"`
+	AccountNo             string       `json:"account_card_number"`
+	UniversalAccountNo    string       `json:"univs_account_card_number"`
+	MemberID              string       `json:"member_id"`
+	Type                  string       `json:"acc_type"`
+	Channel               string       `json:"channel"`
+	AccountChannel        string       `json:"account_channel"`
+	SecurityFirm          string       `json:"security_firm"`
+	Name                  string       `json:"name"`
+	EnabledTradingMarkets []int        `json:"enable_market"`
+	SubAccounts           []SubAccount `json:"sub_accounts,omitempty"`
+}
+
+// SubAccount is a tradable JP sub-account. Non-JP accounts omit this list.
+type SubAccount struct {
+	ID   string `json:"sub_acc_id"`
+	Type string `json:"sub_acc_type"`
 }
 
 type accountWire struct {
@@ -514,6 +596,7 @@ type accountWire struct {
 	SecurityFirm          string          `json:"security_firm"`
 	Name                  string          `json:"name"`
 	EnabledTradingMarkets []int           `json:"enable_market"`
+	SubAccounts           []SubAccount    `json:"sub_accounts"`
 }
 
 // UnmarshalJSON accepts IDs encoded as either JSON strings or numbers.
@@ -540,6 +623,7 @@ func (a *Account) UnmarshalJSON(data []byte) error {
 		Type: wire.Type, Channel: wire.Channel,
 		AccountChannel: wire.AccountChannel, SecurityFirm: wire.SecurityFirm,
 		Name: wire.Name, EnabledTradingMarkets: wire.EnabledTradingMarkets,
+		SubAccounts: wire.SubAccounts,
 	}
 	return nil
 }
@@ -1005,7 +1089,7 @@ func (s *TradeService) ConfirmOrder(ctx context.Context, req OrderConfirmRequest
 // automatically paginating until all results are fetched.
 func (s *TradeService) ListOpenOrders(ctx context.Context, req OpenOrdersRequest) ([]Order, error) {
 	var allOrders []Order
-	pageFlag := ""
+	pageFlag := strings.TrimSpace(req.PageFlag)
 	for {
 		params := newOpenOrdersParams(req, pageFlag)
 		opts := client.CallOpts{
@@ -1032,7 +1116,7 @@ func (s *TradeService) ListOpenOrders(ctx context.Context, req OpenOrdersRequest
 // automatically paginating until all results are fetched.
 func (s *TradeService) ListHistoryOrders(ctx context.Context, req HistoryOrdersRequest) ([]Order, error) {
 	var allOrders []Order
-	pageFlag := ""
+	pageFlag := strings.TrimSpace(req.PageFlag)
 	for {
 		params := newHistoryOrdersParams(req, pageFlag)
 		opts := client.CallOpts{
@@ -1110,7 +1194,7 @@ func (s *TradeService) ListDeals(ctx context.Context, account string) ([]Deal, e
 // automatically paginating until all results are fetched.
 func (s *TradeService) ListTodayDeals(ctx context.Context, req TodayDealsRequest) ([]Deal, error) {
 	var allDeals []Deal
-	pageFlag := ""
+	pageFlag := strings.TrimSpace(req.PageFlag)
 	for {
 		params := newPagedMarketParams(req.Market, req.PageSize, pageFlag)
 		opts := client.CallOpts{
@@ -1137,7 +1221,7 @@ func (s *TradeService) ListTodayDeals(ctx context.Context, req TodayDealsRequest
 // automatically paginating until all results are fetched.
 func (s *TradeService) ListHistoryDeals(ctx context.Context, req HistoryDealsRequest) ([]Deal, error) {
 	var allDeals []Deal
-	pageFlag := ""
+	pageFlag := strings.TrimSpace(req.PageFlag)
 	for {
 		params := newHistoryDealsParams(req, pageFlag)
 		opts := client.CallOpts{
@@ -1445,21 +1529,28 @@ func accountParams(account string) url.Values {
 func newPlaceOrderPayload(req PlaceOrderRequest) placeOrderPayload {
 	payload := placeOrderPayload{
 		Code: req.Code, Side: req.Side, OrderType: req.OrderType,
-		Qty: strconv.FormatInt(req.Qty, qtyFormatBase), Price: req.Price,
+		Qty: quantityString(req.QtyText, req.Qty), Price: req.Price,
 		TimeInForce: req.TimeInForce, LotType: req.LotType, Remark: req.Remark,
 		Session: req.Session, AuxPrice: req.AuxPrice, OrderClass: req.OrderClass,
-		MultiLegInfo: req.MultiLegInfo,
-		PositionID:   req.PositionID, ExpireTime: req.ExpireTime,
+		MultiLegInfo: req.MultiLegInfo, SubAccountID: req.SubAccountID,
+		PositionID: req.PositionID, ExpireTime: req.ExpireTime,
 		TrailType: req.TrailType, TrailValue: req.TrailValue, TrailSpread: req.TrailSpread,
 		PositionOpenType: req.PositionOpenType, AlgoInfo: req.AlgoInfo,
 	}
 	return payload
 }
 
+func quantityString(text string, fallback int64) string {
+	if len(text) > 0 {
+		return text
+	}
+	return strconv.FormatInt(fallback, qtyFormatBase)
+}
+
 func newModifyOrderPayload(req ModifyOrderRequest) modifyOrderPayload {
 	payload := modifyOrderPayload{
 		Exchange:    req.Exchange,
-		Qty:         strconv.FormatInt(req.Qty, qtyFormatBase),
+		Qty:         quantityString(req.QtyText, req.Qty),
 		TrailType:   req.TrailType,
 		TrailValue:  req.TrailValue,
 		TrailSpread: req.TrailSpread,
@@ -1552,6 +1643,9 @@ func newTradingInfoParams(req TradingInfoRequest) url.Values {
 	if len(req.OrderID) > 0 {
 		params.Set("order_id", req.OrderID)
 	}
+	if len(strings.TrimSpace(req.SubAccountID)) > 0 {
+		params.Set("sub_acc_id", strings.TrimSpace(req.SubAccountID))
+	}
 	if len(strings.TrimSpace(req.PositionID)) > 0 {
 		params.Set("position_id", strings.TrimSpace(req.PositionID))
 	}
@@ -1564,12 +1658,14 @@ func newTradingInfoParams(req TradingInfoRequest) url.Values {
 func newPlacedOrder(req PlaceOrderRequest, orderID string) *Order {
 	price, _ := strconv.ParseFloat(req.Price, bitSize64)
 	return &Order{
-		OrderID: orderID,
-		Symbol:  req.Code,
-		Side:    req.Side,
-		Type:    req.OrderType,
-		Price:   price,
-		Qty:     req.Qty,
+		OrderID:   orderID,
+		Symbol:    req.Code,
+		Side:      req.Side,
+		Type:      req.OrderType,
+		Price:     price,
+		Qty:       req.Qty,
+		qtyText:   req.QtyText,
+		priceText: req.Price,
 	}
 }
 
@@ -1579,9 +1675,11 @@ func newModifiedOrder(orderID string, req ModifyOrderRequest, responseOrderID st
 	}
 	price, _ := strconv.ParseFloat(req.Price, bitSize64)
 	return &Order{
-		OrderID: orderID,
-		Type:    orderTypeModified,
-		Price:   price,
-		Qty:     req.Qty,
+		OrderID:   orderID,
+		Type:      orderTypeModified,
+		Price:     price,
+		Qty:       req.Qty,
+		qtyText:   req.QtyText,
+		priceText: req.Price,
 	}
 }

@@ -639,7 +639,7 @@ func TestListTodayDealsUsesAccountPathAndMarket(t *testing.T) {
 	if deal.DealID != "D001" || deal.OrderID != "ORD001" || deal.Symbol != "US.AAPL" {
 		t.Fatalf("deal identity = %#v", deal)
 	}
-	if deal.Side != "BUY" || deal.Price != 180 || deal.Qty != 100 || deal.CounterBrokerID != 12 {
+	if deal.Side != "BUY" || deal.Price != 180 || deal.Qty != 100 || deal.CounterBrokerID != "12" {
 		t.Fatalf("deal values = %#v", deal)
 	}
 }
@@ -930,7 +930,7 @@ func TestListOpenOrdersOmitsInvalidPageSize(t *testing.T) {
 	defer server.Close()
 
 	tradeService := NewTradeService(client.New(server.URL))
-	req := OpenOrdersRequest{Account: "123", Market: "HK", PageSize: 5}
+	req := OpenOrdersRequest{Account: "123", Market: "HK", PageSize: 101}
 	orders, err := tradeService.ListOpenOrders(context.Background(), req)
 	if err != nil {
 		t.Fatalf("ListOpenOrders() error = %v", err)
@@ -1329,5 +1329,97 @@ func TestListCashLogsPaginationParams(t *testing.T) {
 	}
 	if page.PageFlag != "next" || page.Completed {
 		t.Fatalf("page = %#v", page)
+	}
+}
+
+func TestDealOfficialBrokerIDAndUpdateTime(t *testing.T) {
+	var deal Deal
+	if err := json.Unmarshal([]byte(`{"deal_id":"D1","qty":"1","price":"2","counter_broker_id":"001A","update_time":1709251300000000}`), &deal); err != nil {
+		t.Fatal(err)
+	}
+	if deal.CounterBrokerID != "001A" || deal.UpdatedTime != 1709251300000000 {
+		t.Fatalf("unexpected deal: %+v", deal)
+	}
+}
+
+func TestTradePaginationStartsAtRequestedCursor(t *testing.T) {
+	const cursor = "resume-cursor"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("page_flag") != cursor {
+			t.Errorf("page_flag = %q", r.URL.Query().Get("page_flag"))
+		}
+		if got := r.URL.Query().Get("page_size"); got != "5" {
+			t.Errorf("page_size = %q, want 5", got)
+		}
+		fmt.Fprint(w, `{"s":"ok","d":{"orders":[],"order_fills":[],"completed":true}}`)
+	}))
+	defer server.Close()
+	svc := NewTradeService(client.New(server.URL))
+	ctx := context.Background()
+	if _, err := svc.ListOpenOrders(ctx, OpenOrdersRequest{Account: "1", PageFlag: cursor, PageSize: 5}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.ListHistoryOrders(ctx, HistoryOrdersRequest{Account: "1", PageFlag: cursor, PageSize: 5}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.ListTodayDeals(ctx, TodayDealsRequest{Account: "1", PageFlag: cursor, PageSize: 5}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.ListHistoryDeals(ctx, HistoryDealsRequest{Account: "1", PageFlag: cursor, PageSize: 5}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestOrderAndDealPreserveDecimalValues(t *testing.T) {
+	const payload = `{"qty":"0.123456789123456789","price":"1.23456789123456789","dealt_qty":"0.0000000001"}`
+	var order Order
+	if err := json.Unmarshal([]byte(payload), &order); err != nil {
+		t.Fatal(err)
+	}
+	if order.QuantityText() != "0.123456789123456789" || order.PriceText() != "1.23456789123456789" || order.FilledQuantityText() != "0.0000000001" {
+		t.Fatalf("order precision: %+v", order)
+	}
+	var deal Deal
+	if err := json.Unmarshal([]byte(payload), &deal); err != nil {
+		t.Fatal(err)
+	}
+	if deal.QuantityText() != "0.123456789123456789" || deal.PriceText() != "1.23456789123456789" {
+		t.Fatalf("deal precision: %+v", deal)
+	}
+	for _, value := range []any{order, deal} {
+		data, err := json.Marshal(value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var fields map[string]any
+		if err := json.Unmarshal(data, &fields); err != nil {
+			t.Fatal(err)
+		}
+		if fields["qty"] != "0.123456789123456789" || fields["price"] != "1.23456789123456789" {
+			t.Fatalf("lost precision: %s", data)
+		}
+	}
+}
+
+func TestFractionalOrderQuantitySentWithoutRounding(t *testing.T) {
+	const quantity = "0.123456789123456789"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		var got string
+		if err := json.Unmarshal(body["qty"], &got); err != nil || got != quantity {
+			t.Errorf("qty = %s (%v)", body["qty"], err)
+		}
+		fmt.Fprint(w, `{"s":"ok","d":{"order_id":"id"}}`)
+	}))
+	defer server.Close()
+	svc := NewTradeService(client.New(server.URL))
+	if _, err := svc.PlaceOrder(context.Background(), PlaceOrderRequest{Account: "1", QtyText: quantity}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.ModifyOrder(context.Background(), "id", ModifyOrderRequest{Account: "1", QtyText: quantity}); err != nil {
+		t.Fatal(err)
 	}
 }

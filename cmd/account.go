@@ -19,6 +19,7 @@ const (
 	acctHeaderType      = "Account Type"
 	acctHeaderBroker    = "Broker"
 	acctHeaderMarkets   = "Markets"
+	acctHeaderSubAcc    = "Sub Accounts"
 )
 
 const (
@@ -180,6 +181,7 @@ func renderAccountTable(accounts []service.Account) {
 		acctHeaderType,
 		acctHeaderBroker,
 		acctHeaderMarkets,
+		acctHeaderSubAcc,
 	)
 
 	for _, a := range accounts {
@@ -188,6 +190,7 @@ func renderAccountTable(accounts []service.Account) {
 			formatAccountType(a.Type),
 			formatSecurityFirm(a.SecurityFirm),
 			formatTradingMarkets(a.EnabledTradingMarkets),
+			formatSubAccounts(a.SubAccounts),
 		)
 	}
 	tw.Render()
@@ -219,6 +222,18 @@ func formatTradingMarkets(markets []int) string {
 	return strings.Join(values, ", ")
 }
 
+func formatSubAccounts(accounts []service.SubAccount) string {
+	values := make([]string, 0, len(accounts))
+	for _, account := range accounts {
+		if account.Type == "" {
+			values = append(values, account.ID)
+			continue
+		}
+		values = append(values, account.Type+":"+account.ID)
+	}
+	return strings.Join(values, ", ")
+}
+
 func lookupAccount(ctx context.Context, accountID string) (service.Account, bool, error) {
 	accounts, err := tradeSvc.ListAccounts(ctx)
 	if err != nil {
@@ -230,6 +245,24 @@ func lookupAccount(ctx context.Context, accountID string) (service.Account, bool
 		}
 	}
 	return service.Account{}, false, nil
+}
+
+func resolveSubAccountID(ctx context.Context, accountID, explicit string) (string, error) {
+	explicit = strings.TrimSpace(explicit)
+	if explicit != "" {
+		return explicit, nil
+	}
+	account, found, err := lookupAccount(ctx, accountID)
+	if err != nil {
+		return "", fmt.Errorf("looking up sub-accounts: %w", err)
+	}
+	if !found || len(account.SubAccounts) == 0 {
+		return "", nil
+	}
+	if len(account.SubAccounts) == 1 {
+		return account.SubAccounts[0].ID, nil
+	}
+	return "", fmt.Errorf("account %s has multiple sub_acc_id values (%s); pass --sub-acc-id", accountID, formatSubAccounts(account.SubAccounts))
 }
 
 func resolveAssetCategory(ctx context.Context, accountID, explicit string) (string, error) {

@@ -1,9 +1,14 @@
 package cmd
 
 import (
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/futunn/futu/internal/client"
+	"github.com/futunn/futu/internal/service"
 	"github.com/spf13/cobra"
 )
 
@@ -141,6 +146,53 @@ func TestCLINameSymbolParamDoesNotNormalizeAsMarketCode(t *testing.T) {
 	}
 }
 
+func TestQuoteCodeQueryParametersKeepSymbolFlag(t *testing.T) {
+	cases := []struct {
+		id, symbol string
+		args       []string
+	}{
+		{"quote.crypto_institution_holding_list", "CC.BTC", nil},
+		{"quote.crypto_institution_holding_overview", "CC.BTC", nil},
+		{"quote.institution_transaction_record", "US.AAPL", []string{"--institution-id", "403413"}},
+		{"news.by_security", "US.AAPL", nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.id, func(t *testing.T) {
+			testQuoteCodeQueryParameter(t, tc.id, tc.symbol, tc.args)
+		})
+	}
+}
+
+func testQuoteCodeQueryParameter(t *testing.T, id, symbol string, args []string) {
+	t.Helper()
+	var spec *quoteRESTSpec
+	specs := loadQuoteRESTSpecs()
+	for i := range specs {
+		if specs[i].ID == id {
+			spec = &specs[i]
+			break
+		}
+	}
+	if spec == nil {
+		t.Fatalf("missing spec %s", id)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != spec.Path || r.URL.Query().Get("code") != symbol || r.URL.Query().Has("symbol") {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.String())
+		}
+		fmt.Fprint(w, `{"ret_code":0,"data":{}}`)
+	}))
+	defer server.Close()
+	previous := quoteSvc
+	quoteSvc = service.NewQuoteService(client.New(server.URL, client.WithToken("test")))
+	defer func() { quoteSvc = previous }()
+	command := newQuoteRESTCommand(spec)
+	command.SetArgs(append([]string{"--symbol", symbol}, args...))
+	if err := command.Execute(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestReadRESTFlagParsesStringRegisteredConflictFlag(t *testing.T) {
 	command := &cobra.Command{}
 	command.Flags().String("sort-type", "", "")
@@ -157,5 +209,37 @@ func TestReadRESTFlagParsesStringRegisteredConflictFlag(t *testing.T) {
 	}
 	if !ok || got != 2 {
 		t.Fatalf("sort-type = %#v, ok=%v; want 2", got, ok)
+	}
+}
+
+func TestSearchAggregateSupportsNews(t *testing.T) {
+	var search quoteRESTAggregate
+	for _, aggregate := range quoteRESTAggregates {
+		if aggregate.Cmd == "search" {
+			search = aggregate
+			break
+		}
+	}
+	specs := make(map[string]*quoteRESTSpec)
+	for i := range quoteRESTSpecs {
+		specs[quoteRESTSpecs[i].Cmd] = &quoteRESTSpecs[i]
+	}
+	command := newQuoteRESTAggregateCommand(search, specs)
+	if command == nil {
+		t.Fatal("search command not registered")
+	}
+	variants := make(map[string]*quoteRESTSpec)
+	for _, variant := range search.Variants {
+		variants[variant.Value] = specs[variant.Cmd]
+	}
+	selected, err := selectedQuoteRESTSpec(command, search, variants)
+	if err != nil || selected.ID != "quote.community_search" {
+		t.Fatalf("default = %#v, %v", selected, err)
+	}
+	if err := command.Flags().Set("type", "news"); err != nil {
+		t.Fatal(err)
+	}
+	if selected, err := selectedQuoteRESTSpec(command, search, variants); err != nil || selected.ID != "quote.news_search" {
+		t.Fatalf("news = %#v, %v", selected, err)
 	}
 }

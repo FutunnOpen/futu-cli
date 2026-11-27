@@ -49,13 +49,14 @@ func init() {
 func registerDealFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("account", "a", "", "Trading account ID (default: config default_account)")
 	cmd.Flags().StringP("market", "m", service.DefaultTradingMarket, "Trading market: HK, US, HKCC, SG, JP, AU, MY, KR (default: HK)")
-	cmd.Flags().Int("page-size", service.DefaultPageSize, "Page size, range 10-100 (default: 50)")
+	cmd.Flags().String("page-flag", "", "Initial pagination cursor (default: first page; remaining pages fetched automatically)")
+	cmd.Flags().Int("page-size", service.DefaultPageSize, "Page size, range 1-100 (default: 50)")
 }
 
 func registerDealHistoryFlags(cmd *cobra.Command) {
 	registerDealFlags(cmd)
-	cmd.Flags().Int64("start", 0, "Start time as a microsecond timestamp (default: no lower bound)")
-	cmd.Flags().Int64("end", 0, "End time as a microsecond timestamp (default: no upper bound)")
+	cmd.Flags().Int64("start", 0, "Start time in microseconds (default: server chooses a 90-day window)")
+	cmd.Flags().Int64("end", 0, "End time in microseconds (default: server chooses a 90-day window)")
 	cmd.Flags().String("symbol", "", "Symbol filter in MARKET.CODE format, for example US.AAPL")
 }
 
@@ -98,10 +99,15 @@ func buildTodayDealsRequest(cmd *cobra.Command) (service.TodayDealsRequest, erro
 	if err != nil {
 		return service.TodayDealsRequest{}, err
 	}
+	pageFlag, err := cmd.Flags().GetString("page-flag")
+	if err != nil {
+		return service.TodayDealsRequest{}, fmt.Errorf("reading page-flag: %w", err)
+	}
 	return service.TodayDealsRequest{
 		Account:  account,
 		Market:   market,
 		PageSize: pageSize,
+		PageFlag: pageFlag,
 	}, nil
 }
 
@@ -109,6 +115,10 @@ func buildHistoryDealsRequest(cmd *cobra.Command) (service.HistoryDealsRequest, 
 	account, market, pageSize, err := readDealBaseFlags(cmd)
 	if err != nil {
 		return service.HistoryDealsRequest{}, err
+	}
+	pageFlag, err := cmd.Flags().GetString("page-flag")
+	if err != nil {
+		return service.HistoryDealsRequest{}, fmt.Errorf("reading page-flag: %w", err)
 	}
 	start, err := cmd.Flags().GetInt64("start")
 	if err != nil {
@@ -133,6 +143,7 @@ func buildHistoryDealsRequest(cmd *cobra.Command) (service.HistoryDealsRequest, 
 		End:      end,
 		Symbol:   symbol,
 		PageSize: pageSize,
+		PageFlag: pageFlag,
 	}, nil
 }
 
@@ -178,8 +189,8 @@ func renderDealTable(deals []service.Deal) {
 			d.Symbol,
 			d.StockName,
 			d.Side,
-			fmt.Sprintf("%.3f", d.Price),
-			fmt.Sprintf("%d", d.Qty),
+			d.PriceText(),
+			d.QuantityText(),
 			d.Status,
 			formatTimestamp(d.Time),
 			formatTimestamp(d.UpdatedTime),

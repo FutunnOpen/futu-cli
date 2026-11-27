@@ -62,6 +62,30 @@ func TestHasTradingMarket(t *testing.T) {
 	}
 }
 
+func TestResolveSubAccountID(t *testing.T) {
+	restore := stubAccounts(t, `{"s":"ok","d":{"accounts":[`+
+		`{"account_id":"one","security_firm":"FUTUJP","acc_type":"cash","sub_accounts":[{"sub_acc_id":"714908","sub_acc_type":"General"}]},`+
+		`{"account_id":"many","security_firm":"FUTUJP","acc_type":"cash","sub_accounts":[{"sub_acc_id":"1","sub_acc_type":"General"},{"sub_acc_id":"2","sub_acc_type":"NISA"}]},`+
+		`{"account_id":"us","security_firm":"FUTUINC","acc_type":"margin"}]}}`)
+	defer restore()
+
+	got, err := resolveSubAccountID(context.Background(), "one", "")
+	if err != nil || got != "714908" {
+		t.Fatalf("single sub account = %q, %v", got, err)
+	}
+	got, err = resolveSubAccountID(context.Background(), "many", "2")
+	if err != nil || got != "2" {
+		t.Fatalf("explicit sub account = %q, %v", got, err)
+	}
+	if _, err = resolveSubAccountID(context.Background(), "many", ""); err == nil {
+		t.Fatal("expected multiple sub_acc_id values to require --sub-acc-id")
+	}
+	got, err = resolveSubAccountID(context.Background(), "us", "")
+	if err != nil || got != "" {
+		t.Fatalf("non-JP sub account = %q, %v", got, err)
+	}
+}
+
 func TestResolveAssetCategory(t *testing.T) {
 	restore := stubAccounts(t, `{"s":"ok","d":{"accounts":[`+
 		`{"account_id":"margin","security_firm":"FUTUJP","acc_type":"margin"},`+

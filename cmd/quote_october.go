@@ -292,7 +292,8 @@ var octoberQuoteSpecs = []quoteRESTSpec{
 		Positional: "none",
 		Params: []quoteRESTParam{
 			{
-				Name:     "symbol",
+				Name:     "code",
+				CLIName:  "symbol",
 				Kind:     "string",
 				Required: true,
 				Source:   "query",
@@ -324,7 +325,8 @@ var octoberQuoteSpecs = []quoteRESTSpec{
 		Positional: "none",
 		Params: []quoteRESTParam{
 			{
-				Name:     "symbol",
+				Name:     "code",
+				CLIName:  "symbol",
 				Kind:     "string",
 				Required: true,
 				Source:   "query",
@@ -3037,7 +3039,8 @@ var octoberQuoteSpecs = []quoteRESTSpec{
 				Source:   "query",
 			},
 			{
-				Name:     "symbol",
+				Name:     "code",
+				CLIName:  "symbol",
 				Kind:     "string",
 				Required: true,
 				Source:   "query",
@@ -4455,8 +4458,8 @@ var octoberQuoteSpecs = []quoteRESTSpec{
 		Positional: "none",
 		Params: []quoteRESTParam{
 			{
-				Name:     "source",
-				Kind:     "string",
+				Name:     "source_id",
+				Kind:     "int",
 				Required: true,
 				Source:   "query",
 			},
@@ -4477,7 +4480,8 @@ var octoberQuoteSpecs = []quoteRESTSpec{
 		Positional: "none",
 		Params: []quoteRESTParam{
 			{
-				Name:     "symbol",
+				Name:     "code",
+				CLIName:  "symbol",
 				Kind:     "string",
 				Required: true,
 				Source:   "query",

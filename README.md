@@ -184,7 +184,7 @@ Most commands support `--format json` for JSON output and `--format table` (defa
 | `futu option-data <symbol>` | Query option expiration, strategy, spread, exercise probability, or volatility data |
 | `futu plate [symbol]` | Query plate lists, plate stocks, or owner plates |
 | `futu research <symbol>` | Query analyst consensus, Morningstar reports, or rating summaries |
-| `futu search [keyword]` | Search news, community posts, or stock feeds by keyword; also accepts `--keyword` |
+| `futu search [keyword]` | Search news, community content, or securities by keyword; also accepts `--keyword` |
 | `futu shareholders <symbol>` | Query shareholder overview, institutional holders, holding changes, and insider data |
 | `futu short <symbol>` | Query short volume or short interest |
 | `futu valuation [symbol]` | Query valuation detail, plate stocks, index stocks, or index plates |
