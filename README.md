@@ -185,7 +185,7 @@ Most commands support `--format json` for JSON output and `--format table` (defa
 | `futu option-data <symbol>` | Query option expiration, strategy, spread, exercise probability, or volatility data |
 | `futu plate [symbol]` | Query plate lists, plate stocks, or owner plates |
 | `futu research <symbol>` | Query analyst consensus, Morningstar reports, or rating summaries |
-| `futu search [keyword]` | Search news, community content, or securities by keyword; also accepts `--keyword` |
+| `futu search [keyword]` | Search community content, news, or securities by keyword. Default `--type` is `community`; also accepts `--keyword` |
 | `futu shareholders <symbol>` | Query shareholder overview, institutional holders, holding changes, and insider data |
 | `futu short <symbol>` | Query short volume or short interest |
 | `futu valuation [symbol]` | Query valuation detail, plate stocks, index stocks, or index plates |
@@ -205,7 +205,7 @@ Examples:
 futu quote HK.00700 US.AAPL --format json
 futu kline US.AAPL --ktype 1 --format json
 futu capital HK.00700 --view history --period-type WEEK --format json
-futu search AAPL --type community --format json
+futu search AAPL --format json
 futu plate --view list --market HK --plate-class INDUSTRY --format json
 futu trading-days --market US --start 2026-10-01 --end 2026-10-31 --format json
 ```
@@ -219,17 +219,17 @@ Securities and crypto order writes default to dry-run. The first call validates 
 | `futu account list` | List authorized trading accounts; the Account ID is used as `--account` |
 | `futu account funds` | Query account funds (total assets, cash, market value, buying power, P/L, risk status) |
 | `futu position` | List positions; filter by `--symbol US.AAPL` or P/L ratio |
-| `futu order buy <symbol> <qty>` | Preview a buy order (market/limit/stop/limit_if_touched); submit with `--execute` |
-| `futu order sell <symbol> <qty>` | Preview a sell order; submit with `--execute` |
+| `futu order buy <symbol> <qty>` | Preview a buy order (market/limit/stop/limit_if_touched); submit with `--execute`. `qty` is a decimal string. JP accounts with more than one sub-account need `--sub-acc-id` |
+| `futu order sell <symbol> <qty>` | Preview a sell order; submit with `--execute`. Same quantity and `--sub-acc-id` rules as buy |
 | `futu order place <qty>` | Preview a generic securities order (SELL_SHORT, BUY_BACK, conditional, multi-leg) |
-| `futu order modify <order-id>` | Preview order qty/price/trigger changes; requires `--exchange`; submit with `--execute` |
+| `futu order modify <order-id>` | Preview order qty/price/trigger changes; requires `--exchange`; submit with `--execute`. `--qty` is a decimal string |
 | `futu order cancel <order-id>` | Preview cancel; requires `--exchange`; submit with `--execute` |
-| `futu order list` | List open orders; supports `--market` and `--page-size` |
-| `futu order history` | List historical orders; supports `--market`, `--symbol US.AAPL`, `--start`/`--end` (microseconds) |
+| `futu order list` | List open orders. Supports `--market`, `--page-size` (1–100, default 50), and an optional starting `--page-flag`. Later pages are fetched automatically |
+| `futu order history` | List historical orders. Supports `--market`, `--symbol US.AAPL`, `--start`/`--end` (microseconds; omitted means the server uses a 90-day window), `--page-size`, and an optional starting `--page-flag` |
 | `futu order detail <order-id> [order-id...]` | Batch query order details; up to 100 IDs; requires `--exchange` |
-| `futu order max-qty <symbol>` | Query max buy/sell/sell-short/buy-back quantities and margin requirements |
-| `futu deal` | List today's filled trades |
-| `futu deal history` | List historical filled trades; supports `--market`, `--symbol US.AAPL`, `--start`/`--end` (microseconds) |
+| `futu order max-qty <symbol>` | Query max buy/sell/sell-short/buy-back quantities and margin requirements. JP accounts with more than one sub-account need `--sub-acc-id` |
+| `futu deal` | List today's filled trades. Supports `--market`, `--page-size` (1–100), and an optional starting `--page-flag` |
+| `futu deal history` | List historical filled trades. Supports `--market`, `--symbol US.AAPL`, `--start`/`--end` (microseconds; omitted means a 90-day window), `--page-size`, and an optional starting `--page-flag` |
 
 Examples:
 
